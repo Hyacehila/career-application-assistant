@@ -1,0 +1,737 @@
+:root {
+  color-scheme: light;
+
+  --color-page-bg: #FFFFFF;
+  --color-workspace-bg: #F7F9FC;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #111B34;
+  --color-text-secondary: #68758A;
+  --color-border: #E1E7EF;
+  --color-brand: #1768E8;
+  --color-brand-hover: #1259C6;
+  --color-flow-accent: #0F9B96;
+  --color-interview: #F5A400;
+  --color-offer: #14A67A;
+  --color-rejected: #EF4B52;
+  --color-ended: #8A94A6;
+
+  --font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  --page-title-font-size: 28px;
+  --page-title-line-height: 36px;
+  --page-title-font-weight: 700;
+  --company-font-size: 16px;
+  --company-line-height: 24px;
+  --company-font-weight: 700;
+  --job-font-size: 14px;
+  --job-line-height: 22px;
+  --job-font-weight: 600;
+  --body-font-size: 14px;
+  --body-line-height: 22px;
+  --body-font-weight: 400;
+  --body-font-weight-medium: 500;
+  --control-label-font-size: 13px;
+  --control-label-line-height: 20px;
+  --control-label-font-weight: 500;
+  --control-label-font-weight-strong: 600;
+  --aux-font-size: 12px;
+  --aux-line-height: 18px;
+  --aux-font-weight: 400;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-control: 8px;
+  --radius-card: 10px;
+  --radius-overlay: 12px;
+  --border-width: 1px;
+  --shadow-overlay: 0 8px 24px rgba(17, 27, 52, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-page-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+dl,
+dd,
+figure,
+table {
+  margin: 0;
+}
+
+h1 {
+  font-family: var(--font-family);
+  font-size: var(--page-title-font-size);
+  line-height: var(--page-title-line-height);
+  font-weight: var(--page-title-font-weight);
+}
+
+h2 {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+}
+
+button {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+}
+
+table {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight);
+  border-collapse: collapse;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+}
+
+a {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+/* 状态面板（空 / 错误 / 加载） */
+.statePanel {
+  max-width: 420px;
+  margin: 72px auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.stateIconMuted {
+  color: var(--color-ended);
+}
+
+.stateIconError {
+  color: var(--color-rejected);
+}
+
+.stateTitle {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+  color: var(--color-text-primary);
+}
+
+.stateHint {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight);
+  color: var(--color-text-secondary);
+}
+
+.stateAux {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  font-weight: var(--aux-font-weight);
+  color: var(--color-text-secondary);
+}
+
+.primaryButtonSmall {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-brand);
+  color: #FFFFFF;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.primaryButtonSmall:hover {
+  background-color: var(--color-brand-hover);
+}
+
+.secondaryButtonSmall {
+  margin-top: 8px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.secondaryButtonSmall:hover {
+  border-color: var(--color-text-secondary);
+}
+
+/* 加载骨架 */
+.loadingPanel {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loadingText {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.loadingList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loadingCard {
+  height: 56px;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.loadingBarWide,
+.loadingBarNarrow {
+  height: 12px;
+  border-radius: 4px;
+  background-color: var(--color-workspace-bg);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.loadingBarWide {
+  width: 56%;
+}
+
+.loadingBarNarrow {
+  width: 32%;
+}
+
+/* 阶段 4 记录列表 */
+.recordList {
+  max-width: 960px;
+  margin: 0 auto;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.recordTable {
+  width: 100%;
+}
+
+.recordTableHeadCell {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+  color: var(--color-text-secondary);
+  text-align: left;
+  padding: 10px 16px;
+  background-color: var(--color-workspace-bg);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.recordTableRow {
+  border-bottom: var(--border-width) solid var(--color-workspace-bg);
+}
+
+.recordTableRow:last-child {
+  border-bottom: 0;
+}
+
+.recordTableCompany,
+.recordTableJob,
+.recordTableStatus {
+  padding: 12px 16px;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight);
+  color: var(--color-text-primary);
+}
+
+.recordTableCompany {
+  font-weight: var(--company-font-weight);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+}
+
+.recordTableJob {
+  font-weight: var(--job-font-weight);
+}
+
+.recordTableStatus {
+  color: var(--color-text-secondary);
+}
+/* 阶段 5 共享：按钮 / 表单 / 遮罩 */
+.overlayLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: rgba(17, 27, 52, 0.32);
+  animation: overlayFadeIn 210ms ease-out;
+}
+
+.overlayLayerEnd {
+  animation: none;
+}
+
+.overlayCard {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-overlay);
+  box-shadow: var(--shadow-overlay);
+  padding: 20px;
+  animation: overlayCardIn 210ms ease-out;
+}
+
+.overlayCardEnd {
+  animation: none;
+}
+
+.overlayCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.overlayCardTitle {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+  color: var(--color-text-primary);
+}
+
+.overlayCardClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+}
+
+.overlayCardClose:hover {
+  background-color: var(--color-workspace-bg);
+  color: var(--color-text-primary);
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlayCardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+  color: var(--color-text-primary);
+}
+
+.formLabelRequired {
+  color: var(--color-brand);
+}
+
+.formLabelOptional {
+  color: var(--color-text-secondary);
+}
+
+.formInput {
+  height: 36px;
+  padding: 0 10px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.formTextArea {
+  min-height: 84px;
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.formInput:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.formInput:disabled {
+  background-color: var(--color-workspace-bg);
+  color: var(--color-text-secondary);
+}
+
+.formRadioGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.formRadio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+}
+
+.formRadio:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.formRadio input {
+  margin: 0;
+  accent-color: var(--color-flow-accent);
+}
+
+.formRadioActive {
+  border-color: var(--color-flow-accent);
+  background-color: rgba(15, 155, 150, 0.06);
+}
+
+.formHint {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.formNotice {
+  padding: 10px 12px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-workspace-bg);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+}
+
+.formConfirmation {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: var(--border-width) solid var(--color-flow-accent);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  cursor: pointer;
+}
+
+.formConfirmation input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-flow-accent);
+}
+
+@media (max-width: 767px) {
+  .overlayLayer {
+    padding: 12px;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .formInput,
+  .primaryButton,
+  .flowButton,
+  .secondaryButton,
+  .dangerButton {
+    min-height: 44px;
+  }
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-brand);
+  color: #FFFFFF;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.primaryButton:hover {
+  background-color: var(--color-brand-hover);
+}
+
+.primaryButton:disabled {
+  background-color: var(--color-ended);
+  cursor: not-allowed;
+}
+
+.flowButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-flow-accent);
+  color: #FFFFFF;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.flowButton:hover {
+  background-color: #0C837E;
+}
+
+.flowButton:disabled {
+  background-color: var(--color-ended);
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.secondaryButton:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.secondaryButton:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.dangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-rejected);
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.dangerButton:hover {
+  border-color: var(--color-rejected);
+}
+
+.toastViewport {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toastCard {
+  max-width: 480px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-text-primary);
+  color: #FFFFFF;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  box-shadow: var(--shadow-overlay);
+  animation: toastIn 140ms ease-out;
+}
+
+.toastCardEnd {
+  animation: none;
+}
+
+.toastSuccess {
+  background-color: #114B3C;
+}
+
+.toastError {
+  background-color: #8C2F33;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 767px) {
+  .overlayCardClose {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlayLayer,
+  .overlayCard,
+  .toastCard {
+    animation: none;
+  }
+}

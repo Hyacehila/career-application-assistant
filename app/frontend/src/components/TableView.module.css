@@ -1,0 +1,260 @@
+.tableWrap {
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tableHeadCell {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: left;
+  padding: 10px 12px;
+  background-color: var(--color-workspace-bg);
+  border-bottom: var(--border-width) solid var(--color-border);
+  white-space: nowrap;
+}
+
+.sortableHeadCell {
+  padding: 0;
+}
+
+.sortableHeadCell button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: 600;
+}
+
+.sortableHeadCell button:hover {
+  color: var(--color-text-primary);
+}
+
+.row {
+  border-bottom: var(--border-width) solid var(--color-workspace-bg);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background-color: var(--color-workspace-bg);
+}
+
+.rowSelected {
+  background-color: rgba(23, 104, 232, 0.05);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.rowCell {
+  padding: 10px 12px;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.rowCellCompany {
+  font-weight: var(--company-font-weight);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+}
+
+.rowCellJob {
+  font-weight: var(--job-font-weight);
+}
+
+.statusCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-top: var(--border-width) solid var(--color-border);
+  background-color: var(--color-surface);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.paginationInfo {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.paginationControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paginationButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+}
+
+.paginationButton:hover:not(:disabled) {
+  border-color: var(--color-text-secondary);
+}
+
+.paginationButton:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.paginationPage {
+  min-width: 40px;
+  text-align: center;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}
+
+/* 窄屏：紧凑卡片行（两行式） */
+.mobileList {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.mobileRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: var(--border-width) solid var(--color-workspace-bg);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.mobileRow:last-child {
+  border-bottom: 0;
+}
+
+.mobileRow:hover {
+  background-color: var(--color-workspace-bg);
+}
+
+.mobileRow:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
+.mobileRowSelected {
+  background-color: rgba(23, 104, 232, 0.05);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.mobileRowTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mobileRowCompany {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileRowJob {
+  font-family: var(--font-family);
+  font-size: var(--job-font-size);
+  line-height: var(--job-line-height);
+  font-weight: var(--job-font-weight);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileRowBottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.mobileRowMeta {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .mobileRow {
+    min-height: 44px;
+  }
+
+  .paginationButton {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobileRow {
+    transition: none;
+  }
+}

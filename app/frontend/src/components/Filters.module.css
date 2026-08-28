@@ -1,0 +1,61 @@
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+  color: var(--color-text-secondary);
+}
+
+.select {
+  height: 32px;
+  min-width: 96px;
+  padding: 0 8px;
+  padding-right: 26px;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 40%, var(--color-text-secondary) 40%, var(--color-text-secondary) 60%, transparent 60%),
+    linear-gradient(-45deg, transparent 40%, var(--color-text-secondary) 40%, var(--color-text-secondary) 60%, transparent 60%);
+  background-repeat: no-repeat;
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 6px 6px;
+}
+
+.select:hover {
+  border-color: var(--color-text-secondary);
+}
+
+@media (max-width: 767px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .select {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+}

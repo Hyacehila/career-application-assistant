@@ -1,0 +1,207 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-page-bg);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--color-page-bg);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+}
+
+.topLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+.productName {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.viewSwitcher {
+  display: inline-flex;
+  padding: 2px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-workspace-bg);
+}
+
+.viewButton {
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.viewButton:hover {
+  color: var(--color-text-primary);
+}
+
+.viewButtonActive {
+  background-color: var(--color-brand);
+  color: #FFFFFF;
+}
+
+.viewButtonActive:hover {
+  color: #FFFFFF;
+}
+
+.searchForm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchLabel {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+  color: var(--color-text-secondary);
+}
+
+.searchInput {
+  width: 240px;
+  height: 32px;
+  padding: 0 10px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+}
+
+.searchInput:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-brand);
+  color: #FFFFFF;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-font-weight-medium);
+  white-space: nowrap;
+}
+
+.primaryButton:hover {
+  background-color: var(--color-brand-hover);
+}
+
+.filterRow {
+  padding: 8px 20px 12px;
+  border-top: var(--border-width) solid var(--color-workspace-bg);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  background-color: var(--color-workspace-bg);
+  padding: 20px;
+}
+@media (max-width: 767px) {
+  .topRow {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .topLeft {
+    flex: 1 1 100%;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .viewButton {
+    min-height: 44px;
+  }
+
+  .searchForm {
+    flex: 1;
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  .searchLabel {
+    display: none;
+  }
+
+  .searchInput {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .primaryButton {
+    margin-left: auto;
+    height: 44px;
+  }
+
+  .mobileFilterBar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px 12px;
+    border-top: var(--border-width) solid var(--color-workspace-bg);
+  }
+
+  .mobileFilterToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    min-height: 44px;
+    padding: 0 14px;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+  }
+
+  .mobileFilterToggle:disabled {
+    color: var(--color-text-secondary);
+  }
+
+  .mobileFilterChevronOpen {
+    transform: rotate(180deg);
+  }
+
+  .mobileFilterPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background-color: var(--color-surface);
+  }
+
+}

@@ -1,0 +1,38 @@
+# Private runtime materials and local application data (never publish)
+/private/
+/.local/
+/resume_materials.md
+/.resume.sha256
+/private-workspace/
+*.sqlite
+*.sqlite3
+*.db
+*.local.md
+*.private.md
+
+# Attachments and exported documents
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.doc
+*.docx
+
+# Editor and Codex state
+.vscode/
+.idea/
+.codex/
+.playwright-cli/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Node, Python caches and frontend build output
+node_modules/
+.venv/
+.pytest_cache/
+app/frontend/dist/
+*.tsbuildinfo
+__pycache__/
+*.pyc

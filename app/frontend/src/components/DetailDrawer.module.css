@@ -1,0 +1,393 @@
+.drawerWrap {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: transparent;
+  pointer-events: none;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(17, 27, 52, 0.32);
+  animation: overlayFadeIn 210ms ease-out;
+  pointer-events: auto;
+}
+
+.backdropEnd {
+  animation: none;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: max(420px, min(560px, 36vw));
+  background-color: var(--color-surface);
+  border-left: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-overlay) 0 0 var(--radius-overlay);
+  box-shadow: var(--shadow-overlay);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 210ms ease, opacity 210ms ease;
+  pointer-events: auto;
+}
+
+.drawerClosing {
+  transform: translateX(24px);
+  opacity: 0;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.drawerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.drawerTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drawerCompany {
+  font-family: var(--font-family);
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+  font-weight: var(--company-font-weight);
+  color: var(--color-text-primary);
+}
+
+.drawerJob {
+  font-family: var(--font-family);
+  font-size: var(--job-font-size);
+  line-height: var(--job-line-height);
+  font-weight: var(--job-font-weight);
+  color: var(--color-text-primary);
+}
+
+.drawerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background-color: var(--color-workspace-bg);
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.metaRow {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.metaKey {
+  flex: 0 0 64px;
+  color: var(--color-text-secondary);
+}
+
+.metaValue {
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionLabel {
+  font-family: var(--font-family);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.progressPanel {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  background-color: var(--color-surface);
+}
+
+.progressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.progressStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: 500;
+}
+
+.progressDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.progressDate {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.nextActionPanel {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nextActionLabel {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.nextActionValue {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.notesValue {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: var(--border-width) solid var(--color-border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-secondary);
+}
+
+.drawerFoot {
+  padding: 12px 20px;
+  border-top: var(--border-width) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moreMenu {
+  display: flex;
+  flex-direction: column;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.moreMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+}
+
+.moreMenuItem:hover {
+  background-color: var(--color-workspace-bg);
+}
+
+.moreMenuItemDanger {
+  color: var(--color-rejected);
+}
+
+.drawerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.drawerActions .flowButton,
+.drawerActions .secondaryButton {
+  flex: 1;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timelineItem {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background-color: var(--color-surface);
+}
+
+.timelineItemCurrent {
+  border-color: var(--color-brand);
+  background-color: rgba(23, 104, 232, 0.05);
+}
+
+.timelineDot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  background-color: var(--color-text-secondary);
+}
+
+.timelineDotCurrent {
+  background-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(23, 104, 232, 0.16);
+}
+
+.timelineBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timelineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timelineStage {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.timelineDate {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.timelineMeta {
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  color: var(--color-text-secondary);
+}
+
+.timelineNote {
+  font-family: var(--font-family);
+  font-size: var(--body-font-size);
+  line-height: var(--body-line-height);
+  color: var(--color-text-primary);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonBar {
+  height: 14px;
+  border-radius: 4px;
+  background-color: var(--color-workspace-bg);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.skeletonWide { width: 70%; }
+.skeletonNarrow { width: 40%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .backdrop {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* 窄屏：底部抽屉（bottom sheet） */
+.sheetGrabber {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 0;
+  border-radius: 2px;
+  background-color: var(--color-border);
+}
+
+.drawerBottom {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: 72vh;
+  border-left: 0;
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-overlay) var(--radius-overlay) 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.drawerBottomClosing {
+  transform: translateY(24px);
+  opacity: 0;
+}
+
+@media (max-width: 767px) {
+  .drawerBottom .drawerFoot {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .drawerBottom .drawerActions .flowButton,
+  .drawerBottom .drawerActions .secondaryButton {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerBottom {
+    transition: none;
+    animation: none;
+  }
+}
