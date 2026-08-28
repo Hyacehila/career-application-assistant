@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Plus, SlidersHorizontal } from "lucide-react";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
 import Filters from "./Filters";
 import { cn } from "../lib/classNames";
 import { useIsMobile } from "../lib/useIsMobile";

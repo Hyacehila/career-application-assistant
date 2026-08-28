@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react'
+import TriangleAlert from 'lucide-react/dist/esm/icons/triangle-alert'
 
 export interface ErrorStateProps {
   code?: string

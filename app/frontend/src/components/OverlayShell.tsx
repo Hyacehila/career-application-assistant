@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import X from 'lucide-react/dist/esm/icons/x'
 import { cn } from '../lib/classNames'
 import { useReducedMotion } from '../lib/useReducedMotion'
 

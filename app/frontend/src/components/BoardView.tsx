@@ -12,7 +12,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus } from "lucide-react";
+import Plus from "lucide-react/dist/esm/icons/plus";
 import type { ApplicationRecord } from "../api/client";
 import type { BoardQueryError } from "../hooks/useBoardQuery";
 import { cn } from "../lib/classNames";

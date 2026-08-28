@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import type { KeyboardEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
+import ArrowDown from "lucide-react/dist/esm/icons/arrow-down";
+import ArrowUp from "lucide-react/dist/esm/icons/arrow-up";
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import type { ApplicationRecord } from "../api/client";
 import type { BoardQueryError } from "../hooks/useBoardQuery";
 import { cn } from "../lib/classNames";

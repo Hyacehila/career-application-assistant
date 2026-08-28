@@ -64,11 +64,11 @@ SORTABLE_FIELDS = {
 }
 
 
-def _row_to_application(row: sqlite3.Row) -> ApplicationBase:
+def _row_to_application(row: sqlite3.Row | dict) -> ApplicationBase:
     return ApplicationBase.model_validate(dict(row))
 
 
-def _row_to_event(row: sqlite3.Row) -> EventOut:
+def _row_to_event(row: sqlite3.Row | dict) -> EventOut:
     return EventOut.model_validate(dict(row))
 
 
@@ -154,7 +154,7 @@ def patch_application(
     if "job_url" in fields:
         fields["job_url"] = normalize_url(fields["job_url"])
     if not fields:
-        return _row_to_application(_row(record))
+        return _row_to_application(record)
 
     assignments = ", ".join(f"{name} = ?" for name in fields)
     values = list(fields.values()) + [now_iso(), application_id]
@@ -247,7 +247,7 @@ def add_event(
     ).fetchone()
 
     if existing is not None:
-        return _row_to_application(_row(record)), _row_to_event(existing)
+        return _row_to_application(record), _row_to_event(existing)
     if record["current_status"] in FINISHED_STATUSES:
         raise stage_conflict(
             "This application already ended; confirm with the user before adding a new stage."
@@ -255,7 +255,7 @@ def add_event(
 
     event = insert_event(connection, application_id, payload)
     updated = get_application(connection, application_id)
-    return _row_to_application(_row(updated)), event
+    return _row_to_application(updated), event
 
 
 def patch_event(
@@ -265,7 +265,7 @@ def patch_event(
     event = get_event(connection, application_id, event_id)
     fields = payload.model_dump(exclude_unset=True)
     if not fields:
-        return _row_to_event(_row(event))
+        return _row_to_event(event)
 
     merged_event = {
         key: event[key]
@@ -317,14 +317,6 @@ def patch_event(
         "SELECT * FROM application_events WHERE id = ?", (event_id,)
     ).fetchone()
     return _row_to_event(row)
-
-
-def _row(value: dict) -> dict:
-    return value
-
-
-def _search_filter(where: list[str], params: list) -> None:
-    pass
 
 
 def list_applications(
@@ -439,6 +431,7 @@ def list_applications(
         "le_note",
         "le_source",
     )
+    application_rows: list[dict] = []
     for row in rows:
         record = dict(row)
         if record.get("le_stage") is not None:
@@ -458,7 +451,7 @@ def list_applications(
             record["latest_event"] = None
             for key in event_keys:
                 record.pop(key, None)
-        rows[rows.index(row)] = record
+        application_rows.append(record)
 
     count_where, count_params = build(status_filter=False)
     aliased_count_where = (
@@ -512,7 +505,7 @@ def list_applications(
     ).fetchall()
 
     return ListResponse(
-        items=[_row_to_application(row) for row in rows],
+        items=[_row_to_application(row) for row in application_rows],
         total=int(total),
         page=page,
         page_size=page_size,

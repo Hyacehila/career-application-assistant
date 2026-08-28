@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { MoreHorizontal, Pencil, Trash2, X } from "lucide-react";
+import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
+import Pencil from "lucide-react/dist/esm/icons/pencil";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import X from "lucide-react/dist/esm/icons/x";
 import { deleteApplication, type ApplicationRecord, type ApplicationEvent } from "../api/client";
 import { useApplicationDetail } from "../hooks/useApplicationDetail";
 import { useReducedMotion } from "../lib/useReducedMotion";

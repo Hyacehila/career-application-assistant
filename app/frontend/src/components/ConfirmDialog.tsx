@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import Check from 'lucide-react/dist/esm/icons/check'
 import OverlayShell from './OverlayShell'
 
 export interface ConfirmDialogProps {

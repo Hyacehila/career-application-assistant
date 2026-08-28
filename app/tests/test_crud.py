@@ -117,6 +117,33 @@ def test_stage_group_filter(client):
     assert r["total"] == 1
 
 
+def test_listing_keeps_each_record_bound_to_its_latest_event(client):
+    first = _create(client, company="甲公司", job="前端工程师")
+    second = _create(client, company="乙公司", job="后端工程师")
+
+    first_event = client.post(
+        f"/api/applications/{first['id']}/events",
+        json={
+            "stage": "interview_1",
+            "event_date": "2026-08-12",
+            "scheduled_date": "2026-08-15",
+        },
+    )
+    second_event = client.post(
+        f"/api/applications/{second['id']}/events",
+        json={"stage": "offer", "event_date": "2026-08-13"},
+    )
+    assert first_event.status_code == 201
+    assert second_event.status_code == 201
+
+    items = client.get("/api/applications", params={"sort": "company_name"}).json()["items"]
+    latest_by_id = {item["id"]: item["latest_event"]["stage"] for item in items}
+    assert latest_by_id == {
+        first["id"]: "interview_1",
+        second["id"]: "offer",
+    }
+
+
 def test_sort_and_pagination(client):
     for i in range(25):
         _create(client, company=f"公司{i:02d}", job=f"岗位{i}")
