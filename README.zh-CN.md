@@ -117,7 +117,7 @@ pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
 默认页面是五阶段看板，同一批记录也可以切换为九列表格。两种视图共享搜索和筛选条件，页面状态会写入 URL。
 
 - 可以在界面中新增或编辑记录，公司与岗位为必填项。
-- 点击卡片或表格行，可以查看岗位信息、当前进度、事件时间线和下一步事项。
+- 点击卡片或表格行，可以查看记录 ID、岗位信息、当前进度、事件时间线和下一步事项。
 - 通过状态表单或拖动卡片更新阶段。进入“已投递”前必须确认用户已经亲自提交；测评和面试必须提供相应日期。
 - 可以修正事件日期和详情，同时保留原事件 ID。
 - 界面删除采用软删除，历史事件继续保留。
@@ -133,16 +133,36 @@ pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
 完整闭环如下：
 
 1. Codex 只根据 `private/resume_materials.md` 填写高置信度字段，并在需要时替换当前申请的简历附件。
-2. 输出复核摘要前，先调用 `GET /api/health`；服务未运行时，只使用 `scripts/Start-BoardService.ps1` 启动。
-3. 调用 `POST /api/agent/fill-completed`。新记录只能是 `pending_review`，不能直接成为 `applied`。
+2. 输出复核摘要前，使用 `scripts/Invoke-BoardAgent.ps1 -Action FillCompleted` 写入岗位元数据。该命令统一执行健康检查、必要时调用 `Start-BoardService.ps1`，并请求 `POST /api/agent/fill-completed`。
+3. 新记录只能是 `pending_review`，不能直接成为 `applied`；命令输出只包含记录 ID、动作和当前状态。
 4. 你亲自复核页面并完成正式提交。
-5. 只有在你明确说明“我已经亲自提交了这份申请”之后，Codex 才能调用 `POST /api/agent/status-update`，追加来源为 `user_confirmation` 的 `applied` 事件。
+5. 只有在你明确说明“我已经亲自提交了这份申请”之后，Codex 才能使用同一封装命令按记录 ID 追加来源为 `user_confirmation` 的 `applied` 事件。
+
+封装命令只接受具名参数，不接受原始 JSON、数据库路径、其他主机或任意接口。例如：
+
+```powershell
+pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
+  -Action FillCompleted `
+  -CompanyName '示例公司' `
+  -JobTitle '示例岗位' `
+  -JobCode 'EXAMPLE-001' `
+  -Location '上海' `
+  -JobUrl 'https://jobs.example.test/example-001'
+
+pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
+  -Action StatusUpdate `
+  -ApplicationId 42 `
+  -Stage interview_1 `
+  -EventDate 2026-08-29 `
+  -ScheduledDate 2026-09-02 `
+  -EventSource email_extract
+```
 
 后续跟踪时，提供公司/岗位上下文和对应通知即可。例如：
 
 > 我收到了这份申请的测评通知。只提取阶段和日期，更新唯一匹配的看板记录，不要保存原始邮件内容。
 
-只有活动记录唯一匹配、阶段明确、必需日期齐全时，Codex 才能写入。面试轮次必须明确映射为 1 面、2 面、3 面或 HR 面。缺少日期、轮次名称不符合规则、匹配到多条、已结束记录发生冲突或 API 报错时，Agent 必须停止询问，不能猜测。
+只有活动记录唯一匹配、阶段明确、必需日期齐全时，Codex 才能写入。状态更新优先使用此前返回或看板显示的记录 ID；没有可信 ID 时才使用岗位元数据匹配。邮件更新必须使用 `email_extract`，面试轮次必须明确映射为 1 面、2 面、3 面或 HR 面。缺少日期、轮次名称不符合规则、匹配到多条、已结束记录发生冲突或 API 报错时，Agent 必须停止询问，不能猜测。
 
 本地应用只保存结构化结果。不过，用户提供的消息仍会在 Codex 对话中被处理；与匹配和状态无关的私人内容，建议先行删除。
 
@@ -163,7 +183,7 @@ pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
 | `POST` | `/api/agent/fill-completed` | 幂等记录已完成填写、待用户复核的申请 |
 | `POST` | `/api/agent/status-update` | 唯一匹配活动记录并追加结构化状态事件 |
 
-Agent 匹配顺序为：规范化公开岗位网址；公司与岗位编号；公司、岗位与地点。匹配冲突返回 `409`，必填信息缺失或不合法返回 `422`，状态更新没有匹配记录返回 `404`。Agent 不得为了绕过错误而改变原请求语义。
+Agent 状态匹配顺序为：活动记录 ID；规范化公开岗位网址；公司与岗位编号；公司、岗位与地点。记录 ID 是最高优先级精确匹配，已归档或不存在的 ID 返回 `404`。其他匹配冲突返回 `409`，必填信息缺失或不合法返回 `422`。Agent 不得为了绕过错误而改变原请求语义。
 
 ## 数据与隐私模型
 
@@ -215,6 +235,15 @@ git diff --cached
 pnpm --dir app\frontend test
 pnpm --dir app\frontend build
 ```
+
+首次运行浏览器闭环测试前安装锁文件对应的 Chromium，然后执行统一测试入口：
+
+```powershell
+pnpm --dir app\frontend exec playwright install chromium
+pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
+```
+
+该测试在系统临时目录创建隔离 SQLite，模拟“填写字段→上传测试附件→保存草稿→停止在提交前→通过 Agent 命令写入待复核”，结束后关闭测试服务并删除临时数据，不读取真实 `private/` 数据库。
 
 开发前端时，保持 API 运行在 8000 端口，并在另一个终端启动 Vite：
 

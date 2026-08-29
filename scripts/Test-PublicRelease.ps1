@@ -90,12 +90,18 @@ $requiredFiles = @(
     'app/frontend/index.html',
     'app/frontend/package.json',
     'app/frontend/pnpm-lock.yaml',
+    'app/frontend/e2e/agent-fill.spec.ts',
+    'app/frontend/e2e/playwright.config.ts',
     'app/frontend/tsconfig.json',
     'app/frontend/vite.config.ts',
     'app/frontend/src/main.tsx',
     'app/frontend/src/App.tsx',
+    'app/tests/e2e/mock_recruitment.html',
+    'app/tests/e2e/mock_server.py',
     'scripts/Initialize-PrivateOverlay.ps1',
+    'scripts/Invoke-BoardAgent.ps1',
     'scripts/Start-BoardService.ps1',
+    'scripts/Test-AgentBrowserE2E.ps1',
     'scripts/Test-PrivateWorkspace.ps1',
     'scripts/Test-PublicRelease.ps1'
 )
@@ -215,6 +221,9 @@ $requiredAgentRules = @(
     'app/',
     '## 投递记录与状态更新',
     'api/agent/fill-completed',
+    'Invoke-BoardAgent.ps1',
+    'ApplicationId',
+    'email_extract',
     'private/applications.sqlite'
 )
 

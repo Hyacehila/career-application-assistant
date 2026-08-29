@@ -117,7 +117,7 @@ It checks `/api/health`, starts the service in a hidden local window when necess
 The default view is a five-column board. The same records can be viewed as a nine-column table. Both views share search and filters, and their state is represented in the URL.
 
 - Create or edit a record from the interface. Company and role are required.
-- Open a card or row to inspect job metadata, current progress, event history, and next action.
+- Open a card or row to inspect its record ID, job metadata, current progress, event history, and next action.
 - Change status through the status form or drag a card. Moving to Applied requires explicit confirmation that the user submitted it; assessments and interviews require the relevant dates.
 - Correct event dates or details without replacing the event ID.
 - Delete from the interface to archive a record; events are retained as history.
@@ -133,16 +133,36 @@ Start a Codex task in the repository root so that it loads `AGENTS.md`. For brow
 The expected closed loop is:
 
 1. Codex fills high-confidence fields from `private/resume_materials.md` and replaces the current application’s resume attachment when required.
-2. Before presenting the review summary, it calls `GET /api/health`; if needed, it uses `scripts/Start-BoardService.ps1`.
-3. It calls `POST /api/agent/fill-completed`. The resulting status is `pending_review`, never `applied`.
+2. Before presenting the review summary, it uses `scripts/Invoke-BoardAgent.ps1 -Action FillCompleted`. The command performs the health check, invokes `Start-BoardService.ps1` when needed, and calls `POST /api/agent/fill-completed`.
+3. The resulting status is `pending_review`, never `applied`; command output contains only the record ID, action, and current status.
 4. You review the page and submit it yourself.
-5. Only after an explicit statement such as “I have personally submitted this application” may Codex call `POST /api/agent/status-update` with an `applied` event sourced from `user_confirmation`.
+5. Only after an explicit statement such as “I have personally submitted this application” may Codex use the same command with the record ID to append an `applied` event sourced from `user_confirmation`.
+
+The command accepts typed parameters rather than raw JSON, database paths, alternate hosts, or arbitrary endpoints. For example:
+
+```powershell
+pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
+  -Action FillCompleted `
+  -CompanyName 'Example Company' `
+  -JobTitle 'Example Role' `
+  -JobCode 'EXAMPLE-001' `
+  -Location 'Shanghai' `
+  -JobUrl 'https://jobs.example.test/example-001'
+
+pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
+  -Action StatusUpdate `
+  -ApplicationId 42 `
+  -Stage interview_1 `
+  -EventDate 2026-08-29 `
+  -ScheduledDate 2026-09-02 `
+  -EventSource email_extract
+```
 
 For later tracking, provide the company/role context and the relevant notification. For example:
 
 > I received the following assessment notice for this application. Extract only the stage and dates, update the matching board record, and do not save the original message.
 
-Codex may write the update only when exactly one active record matches, the stage is unambiguous, and required dates are present. Interviews must map exactly to first, second, third, or HR interview. Missing dates, non-standard round names, multiple matches, ended-record conflicts, or API errors cause the agent to stop and ask rather than guess.
+Codex may write the update only when exactly one active record matches, the stage is unambiguous, and required dates are present. Status updates prefer a record ID returned earlier or shown by the board; metadata matching is used only when no trusted ID is available. Email-derived updates use `email_extract`. Interviews must map exactly to first, second, third, or HR interview. Missing dates, non-standard round names, multiple matches, ended-record conflicts, or API errors cause the agent to stop and ask rather than guess.
 
 The local application stores only the structured result. The message is still processed in the Codex conversation, so remove unrelated private details before sharing it if they are not needed for matching.
 
@@ -163,7 +183,7 @@ All API responses are JSON under `/api`. POST and PATCH requests must use `Conte
 | `POST` | `/api/agent/fill-completed` | Idempotently record a completed form as pending review |
 | `POST` | `/api/agent/status-update` | Uniquely match an active application and append a structured event |
 
-Agent matching uses, in order: normalized public job URL; company plus job code; or company plus role plus location. Match conflicts return `409`, missing or invalid required information returns `422`, and no status-update match returns `404`. The agent must not change request meaning to work around these responses.
+Agent status matching uses, in order: exact active record ID; normalized public job URL; company plus job code; or company plus role plus location. An archived or unknown ID returns `404`. Other match conflicts return `409`, while missing or invalid information returns `422`. The agent must not change request meaning to work around these responses.
 
 ## Data and privacy model
 
@@ -215,6 +235,15 @@ Run frontend tests and a production build:
 pnpm --dir app\frontend test
 pnpm --dir app\frontend build
 ```
+
+Install the lockfile-compatible Chromium once, then run the persistent browser closed-loop regression:
+
+```powershell
+pnpm --dir app\frontend exec playwright install chromium
+pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
+```
+
+The test creates an isolated SQLite database under the system temp directory and exercises “fill fields → upload a fixture attachment → save draft → stop before final submission → record pending review through the Agent command.” It closes the fixture service and deletes temporary data without reading the real `private/` database.
 
 For frontend development, keep the API on port 8000 and run Vite in a second terminal:
 

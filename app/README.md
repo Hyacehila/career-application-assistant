@@ -13,7 +13,8 @@ always created at `private/applications.sqlite`.
 - `backend/` — the FastAPI application factory, SQLite data layer, migrations,
   and the application/agent routers.
 - `frontend/` — the Vite + React + TypeScript board UI (built to `frontend/dist`).
-- `tests/` — backend pytest suite (temporary databases are injected per test).
+- `tests/` — backend pytest suite plus a public simulated recruitment fixture;
+  all databases are injected under the system temp directory.
 
 ## Run locally
 
@@ -43,6 +44,26 @@ For the agent workflow, the service can be auto-started (idempotent) with:
 
 ```powershell
 pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
+```
+
+Agents use the typed wrapper below instead of assembling raw HTTP JSON. It
+performs the health/start sequence and supports `FillCompleted` plus
+`StatusUpdate`; status matching accepts an exact active `ApplicationId` before
+falling back to URL or job metadata.
+
+```powershell
+pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
+  -Action StatusUpdate -ApplicationId 42 `
+  -Stage assessment -EventDate 2026-08-29 `
+  -DeadlineDate 2026-09-01 -EventSource email_extract
+```
+
+The persistent browser regression uses a simulated recruitment form, a fake
+in-memory upload, the typed Agent wrapper, and an isolated temporary SQLite:
+
+```powershell
+pnpm --dir app\frontend exec playwright install chromium
+pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
 ```
 
 The service binds loopback only. Write requests must be JSON and come from a
