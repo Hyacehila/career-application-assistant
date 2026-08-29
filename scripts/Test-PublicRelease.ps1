@@ -205,6 +205,8 @@ foreach ($trackedFile in $trackedFiles) {
 
 $agentsText = if ($Staged) { Get-IndexText -Path 'AGENTS.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'AGENTS.md' }
 $materialsText = if ($Staged) { Get-IndexText -Path 'resume_materials.example.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'resume_materials.example.md' }
+$e2eSpecText = if ($Staged) { Get-IndexText -Path 'app/frontend/e2e/agent-fill.spec.ts' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'app/frontend/e2e/agent-fill.spec.ts' }
+$e2eServerText = if ($Staged) { Get-IndexText -Path 'app/tests/e2e/mock_server.py' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'app/tests/e2e/mock_server.py' }
 
 $requiredAgentRules = @(
     'Settings → Computer use',
@@ -230,6 +232,18 @@ $requiredAgentRules = @(
 foreach ($requiredAgentRule in $requiredAgentRules) {
     $present = $null -ne $agentsText -and $agentsText.Contains($requiredAgentRule)
     Write-CheckResult -Name 'required-agent-rule' -Passed $present
+}
+
+$requiredE2ESafetyRules = @(
+    @{ Name = 'e2e-agent-command'; Text = $e2eSpecText; Snippet = 'Invoke-BoardAgent.ps1' },
+    @{ Name = 'e2e-final-submit-remains-zero'; Text = $e2eSpecText; Snippet = "data-final-submit-count', '0'" },
+    @{ Name = 'e2e-private-fields-not-persisted'; Text = $e2eSpecText; Snippet = "not.toContain('mock-resume.pdf')" },
+    @{ Name = 'e2e-database-is-temp-isolated'; Text = $e2eServerText; Snippet = 'career-board-e2e-' }
+)
+
+foreach ($requiredE2ESafetyRule in $requiredE2ESafetyRules) {
+    $present = $null -ne $requiredE2ESafetyRule.Text -and $requiredE2ESafetyRule.Text.Contains($requiredE2ESafetyRule.Snippet)
+    Write-CheckResult -Name $requiredE2ESafetyRule.Name -Passed $present
 }
 
 $requiredMaterialSections = @(
