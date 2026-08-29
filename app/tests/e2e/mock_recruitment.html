@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>模拟招聘申请</title>
+    <style>
+      :root {
+        color: #111b34;
+        background: #f7f9fc;
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; }
+      header { padding: 20px 24px; border-bottom: 1px solid #e1e7ef; background: #fff; }
+      header strong { color: #1768e8; }
+      main { width: min(720px, calc(100% - 32px)); margin: 32px auto; }
+      .job, form { border: 1px solid #e1e7ef; border-radius: 12px; background: #fff; }
+      .job { padding: 20px; margin-bottom: 16px; }
+      h1 { margin: 0 0 8px; font-size: 26px; }
+      .job p { margin: 4px 0; color: #68758a; }
+      form { padding: 24px; }
+      .field { margin-bottom: 18px; }
+      label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
+      input, textarea {
+        width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #cfd8e5;
+        border-radius: 8px; color: inherit; background: #fff; font: inherit;
+      }
+      textarea { min-height: 100px; resize: vertical; }
+      input:focus, textarea:focus { outline: 2px solid rgba(23, 104, 232, 0.2); border-color: #1768e8; }
+      .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      button { min-height: 44px; padding: 0 18px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+      #save-draft { border: 1px solid #1768e8; color: #1768e8; background: #fff; }
+      #final-submit { border: 1px solid #1768e8; color: #fff; background: #1768e8; }
+      #status { color: #0f9b96; font-weight: 600; }
+      .test-note { margin-top: 18px; color: #68758a; font-size: 12px; }
+    </style>
+  </head>
+  <body data-final-submit-count="0" data-draft-save-count="0">
+    <header><strong>本地 E2E 夹具</strong> · 不连接任何真实招聘网站</header>
+    <main
+      data-testid="job-metadata"
+      data-company-name="示例招聘公司"
+      data-job-title="软件工程实习生"
+      data-job-code="MOCK-001"
+      data-location="上海"
+      data-source="本地模拟招聘页"
+    >
+      <section class="job" aria-labelledby="job-heading">
+        <h1 id="job-heading">软件工程实习生</h1>
+        <p>示例招聘公司 · 上海</p>
+        <p>岗位编号：MOCK-001</p>
+      </section>
+
+      <form aria-label="模拟招聘申请表">
+        <div class="field">
+          <label for="candidate-name">姓名（必填）</label>
+          <input id="candidate-name" name="candidate_name" autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="candidate-email">邮箱（必填）</label>
+          <input id="candidate-email" name="candidate_email" type="email" autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="education">教育经历（必填）</label>
+          <textarea id="education" name="education" required></textarea>
+        </div>
+        <div class="field">
+          <label for="resume">简历附件（必填）</label>
+          <input id="resume" name="resume" type="file" accept="application/pdf" required />
+        </div>
+        <div class="actions">
+          <button id="save-draft" type="button">保存草稿</button>
+          <button id="final-submit" type="button">提交申请</button>
+          <output id="status" aria-live="polite"></output>
+        </div>
+        <p class="test-note">测试必须停在“提交申请”之前，并将岗位元数据写入隔离看板。</p>
+      </form>
+    </main>
+    <script>
+      const status = document.querySelector('#status');
+      document.querySelector('#save-draft').addEventListener('click', () => {
+        document.body.dataset.draftSaveCount = String(Number(document.body.dataset.draftSaveCount) + 1);
+        status.textContent = '草稿已保存';
+      });
+      document.querySelector('#final-submit').addEventListener('click', () => {
+        document.body.dataset.finalSubmitCount = String(Number(document.body.dataset.finalSubmitCount) + 1);
+        status.textContent = '申请已提交';
+      });
+    </script>
+  </body>
+</html>
