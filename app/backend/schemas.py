@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .errors import ApiError, CODE_VALIDATION, validation_error
 
@@ -251,24 +251,29 @@ class AgentFillCompleted(BaseModel):
         return _check_timestamp(value, "filled_at")
 
 
+class AgentMatch(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    application_id: int | None = Field(default=None, gt=0)
+    company_name: str | None = Field(default=None, max_length=200)
+    job_title: str | None = Field(default=None, max_length=200)
+    job_code: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    job_url: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _has_match_value(self) -> "AgentMatch":
+        values = self.model_dump(exclude_none=True)
+        if not any(value for value in values.values() if str(value).strip()):
+            raise ValueError("match needs at least one non-empty value.")
+        return self
+
+
 class AgentStatusUpdate(BaseModel):
     model_config = {"extra": "forbid"}
 
-    match: dict
+    match: AgentMatch
     event: CreateEvent
-
-    @field_validator("match")
-    @classmethod
-    def _match_fields(cls, value: dict) -> dict:
-        allowed = {"company_name", "job_title", "job_code", "location", "job_url"}
-        if not value:
-            raise ValueError("match must not be empty.")
-        unknown = set(value) - allowed
-        if unknown:
-            raise ValueError(f"Unknown match fields: {', '.join(sorted(unknown))}")
-        if not any(v for v in value.values() if str(v).strip()):
-            raise ValueError("match needs at least one non-empty value.")
-        return value
 
 
 class BoardCounts(BaseModel):

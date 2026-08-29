@@ -110,6 +110,79 @@ def test_status_update_applied_from_user_confirmation(client):
     assert resp.json()["application"]["submitted_at"] == "2026-08-27"
 
 
+def test_status_update_matches_exact_application_id_first(client):
+    created = client.post("/api/agent/fill-completed", json=FILL_BODY).json()
+    resp = client.post(
+        "/api/agent/status-update",
+        json={
+            "match": {
+                "application_id": created["id"],
+                "company_name": "不会覆盖 ID 匹配的公司",
+            },
+            "event": {
+                "stage": "applied",
+                "event_date": "2026-08-27",
+                "source": "user_confirmation",
+            },
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["application"]["id"] == created["id"]
+    assert resp.json()["application"]["current_status"] == "applied"
+
+
+def test_status_update_unknown_application_id_is_404(client):
+    resp = client.post(
+        "/api/agent/status-update",
+        json={
+            "match": {"application_id": 999_999},
+            "event": {
+                "stage": "assessment",
+                "event_date": "2026-08-28",
+                "deadline_date": "2026-09-01",
+                "source": "email_extract",
+            },
+        },
+    )
+    assert resp.status_code == 404
+
+
+def test_status_update_application_id_must_be_positive(client):
+    resp = client.post(
+        "/api/agent/status-update",
+        json={
+            "match": {"application_id": 0},
+            "event": {
+                "stage": "assessment",
+                "event_date": "2026-08-28",
+                "deadline_date": "2026-09-01",
+                "source": "email_extract",
+            },
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_status_update_archived_application_id_is_404(client):
+    created = client.post("/api/agent/fill-completed", json=FILL_BODY).json()
+    archived = client.delete(f"/api/applications/{created['id']}")
+    assert archived.status_code == 204
+
+    resp = client.post(
+        "/api/agent/status-update",
+        json={
+            "match": {"application_id": created["id"]},
+            "event": {
+                "stage": "assessment",
+                "event_date": "2026-08-28",
+                "deadline_date": "2026-09-01",
+                "source": "email_extract",
+            },
+        },
+    )
+    assert resp.status_code == 404
+
+
 def test_status_update_interview_email(client):
     client.post("/api/agent/fill-completed", json=FILL_BODY)
     resp = client.post(

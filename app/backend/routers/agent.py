@@ -32,7 +32,7 @@ def status_update(request: Request, payload: AgentStatusUpdate) -> JSONResponse:
     paths = request.app.state.paths
     with store.open_connection_tx(paths) as connection:
         record, event = store.agent_status_update(
-            connection, payload.match, payload.event
+            connection, payload.match.model_dump(exclude_none=True), payload.event
         )
         return JSONResponse(
             content={"application": record.model_dump(), "event": event.model_dump()}

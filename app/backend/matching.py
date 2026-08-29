@@ -49,6 +49,7 @@ def normalize_url(value: str | None) -> str | None:
 class MatchQuery:
     """Fields used to find a record; every field is optional."""
 
+    application_id: int | None = None
     company_name: str | None = None
     job_title: str | None = None
     job_code: str | None = None
@@ -58,6 +59,7 @@ class MatchQuery:
     @classmethod
     def from_fields(cls, fields: dict[str, object]) -> "MatchQuery":
         return cls(
+            application_id=fields.get("application_id"),
             company_name=fields.get("company_name"),
             job_title=fields.get("job_title"),
             job_code=fields.get("job_code"),
@@ -66,6 +68,8 @@ class MatchQuery:
         )
 
     def has_any(self) -> bool:
+        if self.application_id is not None:
+            return True
         values = (self.company_name, self.job_title, self.job_code, self.location, self.job_url)
         return any(value is not None and str(value).strip() for value in values)
 
@@ -79,14 +83,15 @@ def active_rows(connection) -> list[dict]:
 def find_matching(connection, query: MatchQuery) -> list[dict]:
     """Return the uniquely matched active record for the query.
 
-    Priority: normalized job_url, then company + job_code, then
-    company + job_title + location. Each level is evaluated only when its
-    required fields are present. A level resolves when exactly one record
-    matches it; otherwise the next level is tried. An ambiguous query that
-    never resolves to exactly one record returns [].
+    Priority: exact active application ID, normalized job_url, company +
+    job_code, then company + job_title + location. Once a level finds one or
+    more candidates, lower-priority fields are not used to change that result.
     """
 
     rows = active_rows(connection)
+
+    if query.application_id is not None:
+        return [row for row in rows if row["id"] == query.application_id]
 
     norm_url = normalize_url(query.job_url)
     if norm_url:

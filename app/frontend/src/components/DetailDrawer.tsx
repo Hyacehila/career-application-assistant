@@ -160,6 +160,7 @@ export default function DetailDrawer({
           <div className={styles.drawerTitleGroup}>
             <span className={styles.drawerCompany}>{record.company_name}</span>
             <span className={styles.drawerJob}>{record.job_title}</span>
+            <span className={styles.drawerRecordId}>记录 #{record.id}</span>
           </div>
           <button type="button" aria-label="关闭详情" onClick={requestClose} className="overlayCardClose">
             <X size={18} aria-hidden="true" />

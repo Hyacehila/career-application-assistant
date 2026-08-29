@@ -82,6 +82,15 @@
   color: var(--color-text-primary);
 }
 
+.drawerRecordId {
+  margin-top: 2px;
+  font-family: var(--font-family);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
 .drawerMeta {
   display: flex;
   flex-direction: column;

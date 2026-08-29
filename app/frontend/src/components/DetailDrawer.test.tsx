@@ -89,6 +89,7 @@ describe('DetailDrawer', () => {
     expect(screen.getByTestId('drawer-next-action')).toHaveTextContent('计划日期 2026-08-28')
     expect(screen.getByText('基础设施部')).toBeInTheDocument()
     expect(screen.getByText('FE-2026-001')).toBeInTheDocument()
+    expect(screen.getByText('记录 #42')).toBeInTheDocument()
   })
 
   it('更多操作 → 软删除确认后调用 deleteApplication 并关闭抽屉', async () => {
