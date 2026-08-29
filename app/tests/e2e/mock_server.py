@@ -10,6 +10,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPOSITORY_ROOT / "app"
@@ -44,6 +45,13 @@ def build_test_app(database_path: Path) -> FastAPI:
     init_database(paths)
 
     board_app = create_app(db_path=database_path)
+    frontend_dist = REPOSITORY_ROOT / "app" / "frontend" / "dist"
+    if frontend_dist.is_dir():
+        board_app.mount(
+            "/",
+            StaticFiles(directory=str(frontend_dist), html=True),
+            name="e2e-frontend",
+        )
     fixture_app = FastAPI(title="Career Board Browser E2E Fixture")
 
     @fixture_app.get("/mock-recruitment", response_class=HTMLResponse)
