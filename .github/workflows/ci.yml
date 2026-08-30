@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: "10"
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/frontend/pnpm-lock.yaml
+
+      - name: Check public release policy
+        shell: pwsh
+        run: pwsh -NoProfile -File .\scripts\Test-PublicRelease.ps1
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: uv sync --locked --extra dev --python 3.12
+
+      - name: Run backend tests
+        shell: pwsh
+        run: uv run --locked --extra dev python -m pytest app\tests -q
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: pnpm --dir app\frontend install --frozen-lockfile
+
+      - name: Run frontend tests
+        shell: pwsh
+        run: pnpm --dir app\frontend test
+
+      - name: Build frontend
+        shell: pwsh
+        run: pnpm --dir app\frontend build

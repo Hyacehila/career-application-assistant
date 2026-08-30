@@ -29,10 +29,13 @@ $healthUrl = "$baseUrl/api/health"
 
 # Prefer the repository-local uv virtualenv interpreter, falling back to PATH python.
 $preferredPython = Join-Path $repositoryRoot '.local\venv\Scripts\python.exe'
+$pythonCommand = Get-Command python -ErrorAction SilentlyContinue
 $pythonCandidate = if (Test-Path -LiteralPath $preferredPython) {
     $preferredPython
+} elseif ($null -ne $pythonCommand) {
+    $pythonCommand.Source
 } else {
-    (Get-Command python -ErrorAction SilentlyContinue).Source
+    $null
 }
 if ([string]::IsNullOrWhiteSpace($pythonCandidate)) {
     Write-Output 'FAIL: no python interpreter found. Create .local\venv with uv first.'
@@ -49,7 +52,11 @@ function Test-ServiceHealthy {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            $health.schema_version -eq 3
+            $health.schema_version -eq 3 -and
+            $health.service -eq 'career-application-assistant' -and
+            $health.mode -eq 'standard' -and
+            $health.synthetic_data -eq $false -and
+            $health.mail_ingestion -eq $true
         )
     } catch {
         return $false
@@ -62,10 +69,15 @@ if (Test-ServiceHealthy) {
     exit 0
 }
 
+if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) {
+    Write-Output 'FAIL: port 8000 is occupied by a service that is not the standard Career Application Assistant.'
+    exit 1
+}
+
 # 3. Launch the service in a hidden window pinned to the repository root.
 $serverScript = Join-Path $repositoryRoot 'app\server.py'
 if (-not (Test-Path -LiteralPath $serverScript -PathType Leaf)) {
-    Write-Output "FAIL: server script not found at $serverScript"
+    Write-Output 'FAIL: server entry point is missing.'
     exit 1
 }
 

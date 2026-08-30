@@ -15,8 +15,34 @@
 *.jpg
 *.jpeg
 *.png
+*.gif
+*.webp
+*.svg
 *.doc
 *.docx
+*.mp3
+*.mp4
+*.m4a
+*.m4v
+*.mov
+*.avi
+*.webm
+*.wav
+*.ogg
+*.oga
+*.opus
+*.flac
+*.aac
+*.wma
+*.wmv
+*.mkv
+*.mpeg
+*.mpg
+*.flv
+*.aif
+*.aiff
+*.mid
+*.midi
 
 # Editor and Codex state
 .vscode/

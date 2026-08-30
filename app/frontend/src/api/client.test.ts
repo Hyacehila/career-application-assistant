@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   APIError,
   dismissMailCandidate,
+  health,
   listAllApplications,
   listApplications,
   pauseMailAccount,
   resumeMailAccount,
+  resetDemo,
   syncMailAccount,
 } from './client'
 import { jsonBody } from '../test/http'
@@ -15,6 +17,28 @@ afterEach(() => {
 })
 
 describe('api client', () => {
+  it('读取类型化 health 并以空 JSON 请求重置 Demo', async () => {
+    const healthPayload = {
+      status: 'ok',
+      database: 'ready',
+      schema_version: 3,
+      service: 'career-application-assistant',
+      mode: 'demo',
+      synthetic_data: true,
+      mail_ingestion: false,
+    }
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+      if (String(input) === '/api/health') return Promise.resolve(jsonBody(healthPayload))
+      return Promise.resolve(jsonBody({ ok: true, records_seeded: 6 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(health()).resolves.toEqual(healthPayload)
+    await expect(resetDemo()).resolves.toEqual({ ok: true, records_seeded: 6 })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/demo/reset')
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', body: '{}' })
+  })
+
   it('构造 /api/applications 查询参数（camelCase 映射为 snake_case）', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonBody({ items: [], total: 0, page: 2, page_size: 10 }))
     vi.stubGlobal('fetch', fetchMock)

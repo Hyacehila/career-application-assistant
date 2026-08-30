@@ -2,312 +2,103 @@
 
 [English](README.md) | 简体中文
 
-这是一个面向本地单用户的求职工作区，将受约束的招聘表单填写、AI 辅助状态更新和投递看板放在同一套流程里。Agent 可以准备申请页面并维护投递时间线，但最终复核和正式提交始终由用户本人完成。
+求职投递助手是一套本地单用户工作流：先把招聘申请准备到最终提交前，由你本人复核并亲自提交，再通过结构化事件时间线持续跟踪进展。
+
+它把三项实用能力放在一起：
+
+1. 受约束的表单准备：Codex 只读取明确维护的本地资料文件，填写你已经在 Chrome 中打开的招聘页面，并在最终提交前停止。
+2. 可持续使用的本地记录：看板和表格集中保存岗位元数据、下一步事项与经过校验的阶段事件。
+3. 可选的只读邮件接入：Outlook、QQ 邮箱和 163 邮箱可以生成有界的结构化复核候选，但本项目不会变成收件箱客户端。
 
 > [!IMPORTANT]
-> 私有文件位于 Git 忽略的 `private/` 覆盖层中，并不是加密保险箱。请保护本地工作区，按需排除备份或同步工具，并在发布变更前执行公开发布检查。
+> `private/` 是被 Git 忽略的本地存储，不是加密保险箱。请保护工作区，检查备份与同步设置，并在公开变更前运行发布安全检查。
 
-## 项目实现了什么
+## 明确边界
 
-| 范围 | 已实现的行为 |
-| --- | --- |
-| 表单辅助 | Codex 只读取 `private/resume_materials.md`，填写 Chrome 中已打开的招聘页面，上传明确声明的附件，并在最终提交前停止。 |
-| Agent 入库 | 表单准备完成后，Agent 检查或启动本地 API，并幂等创建 `pending_review`（待人工复核）记录。 |
-| 状态跟踪 | 用户确认已投递，以及后续测评、面试、Offer、拒绝或撤回，都会作为经过校验的时间线事件追加。 |
-| 邮件接入 | Outlook 通过 Microsoft Graph delta query 轮询；QQ、163 通过只读 IMAPS UID 增量轮询；只有结构化招聘事件进入看板。 |
-| 本地看板 | React 看板和表格支持搜索、筛选、排序、分页、拖拽更新阶段、详情抽屉、下一步事项和软删除。 |
-| 本地数据 | FastAPI 只向 `private/applications.sqlite` 写入一个 SQLite 数据库；生产环境不接受任意数据库路径。 |
-| 安全边界 | API 仅监听本机，拒绝非 JSON 写请求和异常 Host，校验日期与状态变更；填表回调永远不能把记录标记为已投递。 |
+本项目不是自动海投或批量投递工具。它不会执行最终的提交、确认、发送或申请动作，也不会自动处理登录、验证码、身份验证、付费、背景调查授权、账号创建或外部授权。页面准备完成后，必须由用户复核并亲自提交。
 
-系统使用 10 个精确状态，并归入 5 个看板分组：
-
-| 看板分组 | 精确状态 |
-| --- | --- |
-| 待人工复核 | `pending_review` |
-| 已投递 | `applied` |
-| 笔试 / 测评 | `assessment` |
-| 面试 | `interview_1`、`interview_2`、`interview_3`、`interview_hr` |
-| 已结束 | `offer`、`rejected`、`withdrawn` |
-
-## 项目明确不做什么
-
-- 不点击“提交申请”“确认”“发送”或任何含义相同的最终操作。
-- 它不是邮件客户端：没有收件箱 UI、邮件搜索、附件下载、SMTP、回复、转发、删除或已读状态修改。
-- 首版不提供 webhook。服务仅监听本机，没有 Microsoft Graph 所需的公网 HTTPS 回调地址，因此采用轮询。
-- 不处理自动登录、验证码、身份验证、账号注册、付费、背景调查同意或外部授权。
-- 不爬取岗位、不推荐职位、不发送通知、不同步日历，也不执行无人值守的批量投递。
-- 不提供用户账号、云同步、远程访问或多人部署。
-- SQLite 不保存简历内容、候选人联系方式、表单答案、附件、邮件正文、验证码或会议链接。
-
-## 系统结构
+支持的流程保持简单：
 
 ```text
-private/resume_materials.md ──> Codex ──> 已打开的招聘页面
-                                  │         （最终提交前停止）
-                                  │
-                                  └──────> 本地 JSON API ──> private/applications.sqlite
-                                                     ▲
-                                                     │
-                              Graph / 只读 IMAPS     │
-                                      邮箱服务商 ────┤
-                                                     │
-                                      React 看板 / 表格 / 邮件接入
+本地申请资料
+    -> Codex 准备当前打开的招聘表单
+    -> 用户复核并亲自提交
+    -> 结构化事件更新本地时间线
+    -> 通过看板和表格继续跟踪
 ```
 
-`AGENTS.md` 规定 Agent 的浏览器操作、隐私、附件替换、冲突处理和数据库写入规则。看板界面与 Agent 使用同一个 HTTP API；Agent 不得直接执行 SQL。
+表单填写、投递记录和邮件接入遵循同一规则：真实候选人资料与原始邮件内容不得成为公开仓库数据。
 
-## 快速开始
+## 体验合成 Demo
 
-### 环境要求
+Demo 使用六条明显虚构的记录，并把数据放在隔离的系统临时目录中。它不会初始化 `private/`，不会挂载 Agent 或邮件路由，也不会调用邮箱凭据。会话结束后，所有 Demo 改动都会清除。
 
-当前文档和测试采用 Windows 环境：
+```powershell
+pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Demo
+pwsh -NoProfile -File .\scripts\Start-Demo.ps1
+```
 
-- Git；
-- PowerShell 5.1 或更高版本（示例使用 `pwsh`）；
-- Python 3.12 或更高版本；
-- [`uv`](https://docs.astral.sh/uv/)；
-- [`pnpm`](https://pnpm.io/)。
+打开 [http://127.0.0.1:8001](http://127.0.0.1:8001)。可以使用页面中的重置操作，也可以执行：
 
-### 1. 创建私有覆盖层
+```powershell
+pwsh -NoProfile -File .\scripts\Start-Demo.ps1 -Reset
+```
 
-在全新克隆中执行一次：
+Demo 服务只以前台方式运行。按 Ctrl+C 停止并清理当前会话目录。
+
+## 使用本地工作区
+
+环境要求：Windows、PowerShell 5.1 或更高版本、Python 3.12 或更高版本、[`uv`](https://docs.astral.sh/uv/) 与 [`pnpm`](https://pnpm.io/)。示例使用 PowerShell 7 提供的 `pwsh`；使用 Windows PowerShell 5.1 时，请改用 `powershell.exe`。
 
 ```powershell
 pwsh -NoProfile -File .\scripts\Initialize-PrivateOverlay.ps1
-```
-
-脚本会根据公开占位模板创建 `private/resume_materials.md`。如果 `private/` 已经包含文件，脚本会停止，不会覆盖现有资料。
-
-补全生成的资料文件，只将其中明确声明的附件放入 `private/`，然后校验私有工作区：
-
-```powershell
-pwsh -NoProfile -File .\scripts\Test-PrivateWorkspace.ps1 -WorkspaceRoot .\private -InitializeResumeHash
-pwsh -NoProfile -File .\scripts\Test-PrivateWorkspace.ps1 -WorkspaceRoot .\private
-```
-
-校验器只输出检查项和通过/失败结果，不打印个人资料。简历哈希用于确认预期附件，哈希状态文件同样被 Git 忽略。
-
-### 2. 安装依赖并构建前端
-
-在仓库根目录执行：
-
-```powershell
 uv venv .local\venv --python 3.12
 $env:UV_PROJECT_ENVIRONMENT = "$PWD\.local\venv"
-uv sync --extra dev
-pnpm --dir app\frontend install
+uv sync --locked --extra dev
+pnpm --dir app\frontend install --frozen-lockfile
 pnpm --dir app\frontend build
-```
-
-依赖由 `uv.lock` 和 `app/frontend/pnpm-lock.yaml` 约束。本地环境、缓存和前端构建产物不会进入 Git。
-
-### 3. 启动应用
-
-```powershell
+pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 .\.local\venv\Scripts\python.exe app\server.py
 ```
 
-打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)。一个进程同时提供 API 和已构建前端，并且只监听本机。数据库缺失时只会在 `private/applications.sqlite` 初始化；数据库版本未知或不兼容时，服务会停止，而不是覆盖数据。
+打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)。正式服务只能使用固定的 `private/applications.sqlite`，并且只监听本机 loopback。
 
-Agent 使用的幂等启动入口为：
+初始化脚本可以安全重复执行：只有 `private/resume_materials.md` 缺失时才从公开占位模板创建；已有资料文件不会被读取或覆盖。完整安装与校验步骤见[开始使用](docs/getting-started.zh-CN.md)。
 
-```powershell
-pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
-```
+## 功能摘要
 
-脚本先检查 `/api/health`，必要时在隐藏的本机窗口启动服务，并等待约 10 秒。它不会安装依赖、下载内容或删除文件。
+- 五列看板与详细表格，支持搜索、筛选、排序、分页、响应式布局、详情、下一步事项和软删除。
+- 十个精确状态以追加式、经过校验的时间线事件表示；`applied` 始终要求用户明确确认。
+- 通过类型化 Agent 接口和 PowerShell 封装命令记录已准备的表单与后续状态，无需直接操作 SQLite。
+- 可选的只读增量邮件接入：Outlook 使用 Microsoft Graph，QQ/163 使用 TLS IMAP，并提供结构化人工复核队列。
+- 可编辑、可重置的合成 Demo，无法访问正式数据库、Agent 路由或邮件运行时。
+- 后端、前端、浏览器回归、发布策略和 Windows CI 检查均不需要真实招聘网站或邮箱账号。
 
-## 使用看板
+## 安全摘要
 
-默认页面是五阶段看板，同一批记录也可以切换为九列表格。两种视图共享搜索和筛选条件，页面状态会写入 URL。
+- 候选人资料与投递数据只留在被忽略的本地路径；应用代码、规则、测试与占位模板才进入公开仓库。
+- 正式 API 监听 `127.0.0.1:8000`，Demo 监听 `127.0.0.1:8001`；两者都不支持远程或多用户部署。
+- 邮件接入只读。凭据和令牌使用 Windows Credential Manager 或受 DPAPI 保护的存储，安全存储不可用时失败关闭。
+- SQLite 只保存岗位元数据与有界的结构化事件，不保存简历内容、表单答案、原始邮件、附件、验证码或会议链接。
+- 公开变更必须按精确路径暂存，并运行 `scripts/Test-PublicRelease.ps1 -Staged`；安全检查失败时不得绕过。
 
-- 可以在界面中新增或编辑记录，公司与岗位为必填项。
-- 点击卡片或表格行，可以查看记录 ID、岗位信息、当前进度、事件时间线和下一步事项。
-- 通过状态表单或拖动卡片更新阶段。进入“已投递”前必须确认用户已经亲自提交；测评和面试必须提供相应日期。
-- 可以修正事件日期和详情，同时保留原事件 ID。
-- 界面删除采用软删除，历史事件继续保留。
+处理个人数据或开启邮件接入前，请阅读[安全与隐私](docs/security-and-privacy.zh-CN.md)。
 
-屏幕宽度小于 768 px 时，看板会变成单阶段列表，详情使用底部抽屉。响应式布局只用于本机窄屏显示，不会开放局域网访问。
+## 文档
 
-## 只读邮件接入
+- [文档索引](docs/README.zh-CN.md)
+- [开始使用](docs/getting-started.zh-CN.md)
+- [申请工作流](docs/application-workflow.zh-CN.md)
+- [邮件接入](docs/mail-ingestion.zh-CN.md)
+- [安全与隐私](docs/security-and-privacy.zh-CN.md)
+- [开发与 API 参考](docs/development.zh-CN.md)
+- [后端目录说明](app/README.md)
+- [第三方依赖声明](THIRD_PARTY_NOTICES.md)
 
-在顶部进入“邮件接入”，可按需连接以下三个服务商：
+## 贡献与路线图
 
-| 服务商 | 连接方式 | 增量游标 | 密钥保存位置 |
-| --- | --- | --- | --- |
-| Outlook / Outlook.com | Microsoft Graph 用户委托 `Mail.Read`，授权码流程 + PKCE | Inbox delta link | `%LOCALAPPDATA%` 下由 Windows DPAPI 加密的 MSAL 缓存 |
-| QQ 邮箱 | 993 端口 TLS IMAP + 单独生成的授权码 | `UIDVALIDITY` + 最后处理 UID | Windows Credential Manager |
-| 163 邮箱 | 993 端口 TLS IMAP + 客户端授权密码 | `UIDVALIDITY` + 最后处理 UID | Windows Credential Manager |
-
-Outlook 需要先注册 Microsoft Entra **公共客户端**应用；如需个人 Outlook.com 账号，应允许个人 Microsoft 账号，并将 `http://localhost` 配置为移动和桌面应用重定向 URI，再添加用户委托的 `Mail.Read`。界面只填写公开的 Client ID，不使用客户端密钥。MSAL 通过授权码流程和 PKCE 完成交互登录，在默认公共客户端流程中请求离线访问，并从 DPAPI 加密缓存刷新令牌。实现遵循官方 [邮件增量查询 API](https://learn.microsoft.com/zh-cn/graph/api/message-delta?view=graph-rest-1.0)，认证复用开源的 [MSAL Python](https://github.com/AzureAD/microsoft-authentication-library-for-python)。
-
-QQ、163 需要先在邮箱设置中启用 IMAP，并单独生成客户端授权码/授权密码；不要填写网页版登录密码。可参考 [QQ 邮箱连接说明](https://hiflow.tencent.com/docs/applications/qq-mail/) 和 [网易邮箱帮助](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae)。
-
-首次连接默认只读取连接后到达的新邮件，也可以明确选择回溯 30 天或 90 天。单进程调度器约每五分钟轮询一次。服务先读取主题、发件人和时间，只有命中招聘高召回规则时，才读取有大小限制且不是附件的文本正文。IMAP 始终以只读方式选择 Inbox，使用 UID 查询和 `BODY.PEEK`；代码没有邮箱写入接口。
-
-只有精确轮次的面试和测评，才可能在以下条件全部满足时自动写入：唯一匹配活动记录、必需日期明确、状态迁移安全、可信度不低于 90。泛化面试、日期歧义或冲突、没有匹配或多条匹配、`applied`、结束阶段、归档记录和不安全迁移都会进入人工复核。“已投递”仍必须由用户确认本人已经完成最终投递。
-
-待复核期间只保存公司、岗位、建议阶段、日期、可信度、匹配记录 ID，以及服务商、指纹和队列元数据。主题、发件人、完整正文、附件、会议链接、验证码和私人联系人不会落库。待复核候选 90 天后过期并清除结构化字段；确认、忽略、重复或过期时立即清除。断开邮箱会删除增量游标和安全凭据/令牌缓存。
-
-## 让 Codex 直接辅助写入数据库
-
-请从仓库根目录开始 Codex 任务，确保它能读取 `AGENTS.md`。需要填写招聘页面时，先连接 Codex Chrome 扩展，并由你亲自打开目标申请页面，然后直接提出类似请求：
-
-> 按照 `AGENTS.md` 填写当前打开的招聘申请页面，在最终提交前停止，并把已准备好的申请记录到本地看板。
-
-完整闭环如下：
-
-1. Codex 只根据 `private/resume_materials.md` 填写高置信度字段，并在需要时替换当前申请的简历附件。
-2. 输出复核摘要前，使用 `scripts/Invoke-BoardAgent.ps1 -Action FillCompleted` 写入岗位元数据。该命令统一执行健康检查、必要时调用 `Start-BoardService.ps1`，并请求 `POST /api/agent/fill-completed`。
-3. 新记录只能是 `pending_review`，不能直接成为 `applied`；命令输出只包含记录 ID、动作和当前状态。
-4. 你亲自复核页面并完成正式提交。
-5. 只有在你明确说明“我已经亲自提交了这份申请”之后，Codex 才能使用同一封装命令按记录 ID 追加来源为 `user_confirmation` 的 `applied` 事件。
-
-封装命令只接受具名参数，不接受原始 JSON、数据库路径、其他主机或任意接口。例如：
-
-```powershell
-pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
-  -Action FillCompleted `
-  -CompanyName '示例公司' `
-  -JobTitle '示例岗位' `
-  -JobCode 'EXAMPLE-001' `
-  -Location '上海' `
-  -JobUrl 'https://jobs.example.test/example-001'
-
-pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
-  -Action StatusUpdate `
-  -ApplicationId 42 `
-  -Stage interview_1 `
-  -EventDate 2026-08-29 `
-  -ScheduledDate 2026-09-02 `
-  -EventSource email_extract
-```
-
-后续跟踪时，提供公司/岗位上下文和对应通知即可。例如：
-
-> 我收到了这份申请的测评通知。只提取阶段和日期，更新唯一匹配的看板记录，不要保存原始邮件内容。
-
-只有活动记录唯一匹配、阶段明确、必需日期齐全时，Codex 才能写入。状态更新优先使用此前返回或看板显示的记录 ID；没有可信 ID 时才使用岗位元数据匹配。邮件更新必须使用 `email_extract`，面试轮次必须明确映射为 1 面、2 面、3 面或 HR 面。缺少日期、轮次名称不符合规则、匹配到多条、已结束记录发生冲突或 API 报错时，Agent 必须停止询问，不能猜测。
-
-本地应用只保存结构化结果。不过，用户提供的消息仍会在 Codex 对话中被处理；与匹配和状态无关的私人内容，建议先行删除。
-
-## API 概览
-
-所有接口都位于 `/api` 下并返回 JSON。POST 和 PATCH 请求必须使用 `Content-Type: application/json`。
-
-| 方法 | 接口 | 用途 |
-| --- | --- | --- |
-| `GET` | `/api/health` | 检查服务、数据库和迁移版本 |
-| `GET` | `/api/applications` | 返回分页记录、筛选选项和五组看板计数 |
-| `POST` | `/api/applications` | 手动建立待人工复核记录 |
-| `GET` | `/api/applications/{id}` | 返回岗位详情和事件时间线 |
-| `PATCH` | `/api/applications/{id}` | 编辑元数据、备注和下一步；不能直接改状态 |
-| `DELETE` | `/api/applications/{id}` | 软删除记录 |
-| `POST` | `/api/applications/{id}/events` | 追加经过校验的状态事件，并在事务中更新当前状态 |
-| `PATCH` | `/api/applications/{id}/events/{event_id}` | 修正事件日程，同时保留事件 ID |
-| `POST` | `/api/agent/fill-completed` | 幂等记录已完成填写、待用户复核的申请 |
-| `POST` | `/api/agent/status-update` | 唯一匹配活动记录并追加结构化状态事件 |
-| `GET` | `/api/mail/accounts` | 返回三个服务商的连接状态和待复核数量 |
-| `POST` | `/api/mail/accounts/{provider}/connect` | 启动 Outlook 交互授权，或验证并保存 IMAP 授权码 |
-| `POST` | `/api/mail/accounts/{provider}/sync` | 启动一次增量只读同步 |
-| `POST` | `/api/mail/accounts/{provider}/pause` | 暂停定时轮询但保留安全凭据 |
-| `POST` | `/api/mail/accounts/{provider}/resume` | 恢复轮询并请求立即同步 |
-| `DELETE` | `/api/mail/accounts/{provider}` | 删除游标和安全凭据/令牌缓存 |
-| `GET` | `/api/mail/operations/{id}` | 通过脱敏状态码查询连接/同步操作 |
-| `GET` | `/api/mail/candidates` | 查看结构化复核候选，不包含原始邮件字段 |
-| `POST` | `/api/mail/candidates/{id}/confirm` | 校验并追加人工复核后的时间线事件 |
-| `POST` | `/api/mail/candidates/{id}/dismiss` | 忽略并清除待复核候选的结构化字段 |
-
-Agent 状态匹配顺序为：活动记录 ID；规范化公开岗位网址；公司与岗位编号；公司、岗位与地点。记录 ID 是最高优先级精确匹配，已归档或不存在的 ID 返回 `404`。其他匹配冲突返回 `409`，必填信息缺失或不合法返回 `422`。Agent 不得为了绕过错误而改变原请求语义。
-
-## 数据与隐私模型
-
-### 会进入 Git 的公开内容
-
-- `app/` 中的应用代码和测试；
-- `scripts/` 中的初始化、启动与安全检查脚本；
-- `AGENTS.md`、中英文 README、依赖锁文件、许可证和纯占位模板。
-
-### 只保留在本机的忽略内容
-
-- `private/resume_materials.md`；
-- `private/applications.sqlite` 以及其他 SQLite 文件；
-- 简历、照片、文档和图片附件；
-- `.resume.sha256`、本地虚拟环境、缓存、编辑器状态和构建输出。
-
-SQLite 只保存岗位元数据、当前状态、结构化事件日期、短备注、下一步事项、邮箱游标和有界的结构化复核队列，不包含邮箱地址、凭据、令牌或原始邮件。QQ/163 授权码写入以不透明账号 ID 为键的 Windows Credential Manager 项；Outlook 使用 `msal-extensions` 和 Windows DPAPI，无法使用安全存储时会直接失败，绝不回退到明文缓存。API 会从公开岗位网址中移除查询参数和片段，并拒绝未定义的请求字段。
-
-需要备份时，应先停止服务，再将 `private/applications.sqlite` 复制到另一个受保护的本地位置。不要把备份放入 Git。Git 忽略规则不会阻止操作系统备份或云盘同步 `private/`，这些系统需要单独配置。
-
-不要通过反向代理、端口转发、隧道或局域网绑定暴露 8000 端口。系统没有用户认证，因为唯一支持的部署方式是本机 loopback。
-
-## 安全公开仓库
-
-只显式暂存预期公开路径。不要使用 `git add .`、`git add -A` 或 `git add -f`：
-
-```powershell
-git add -- README.md README.zh-CN.md
-# 其他公开文件也要逐个写出并确认准确路径，不要一次暂存整个目录。
-pwsh -NoProfile -File .\scripts\Test-PublicRelease.ps1 -Staged
-git diff --cached --check
-git diff --cached --name-only
-git diff --cached
-```
-
-发布检查会校验公开路径白名单，并拒绝私有路径、数据库、常见附件类型、可识别密钥、个人联系方式模式、未跟踪文件和缺失的必要规则。该脚本是一道防线，不是对所有自然语言内容的数学证明；提交前仍需人工查看完整暂存差异，检查失败时不得绕过。
-
-## 开发与验证
-
-使用仓库虚拟环境运行后端测试：
-
-```powershell
-.\.local\venv\Scripts\python.exe -m pytest app\tests -q
-```
-
-运行前端测试和生产构建：
-
-```powershell
-pnpm --dir app\frontend test
-pnpm --dir app\frontend build
-```
-
-单元测试使用确定性的 Graph/IMAP 测试替身，不需要真实账号。另有可选的无认证 TLS 冒烟检查，只连接 `imap.qq.com:993` 和 `imap.163.com:993`，不得发送任何凭据。
-
-首次运行浏览器闭环测试前安装锁文件对应的 Chromium，然后执行统一测试入口：
-
-```powershell
-pnpm --dir app\frontend exec playwright install chromium
-pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
-```
-
-该测试在系统临时目录创建隔离 SQLite，模拟“填写字段→上传测试附件→保存草稿→停止在提交前→通过 Agent 命令写入待复核”，结束后关闭测试服务并删除临时数据，不读取真实 `private/` 数据库。
-
-开发前端时，保持 API 运行在 8000 端口，并在另一个终端启动 Vite：
-
-```powershell
-pnpm --dir app\frontend dev
-```
-
-打开 `http://127.0.0.1:5173`；Vite 会把 `/api` 代理到本地 FastAPI 服务。
-
-后端目录结构和启动说明见 [app/README.md](app/README.md)。
-
-## 常见问题
-
-| 现象 | 检查方法 |
-| --- | --- |
-| 启动时提示缺少私有覆盖层 | 从仓库根目录运行 `Initialize-PrivateOverlay.ps1`。 |
-| 启动脚本找不到 Python | 建立 `.local/venv`，并执行 `uv sync --extra dev`。 |
-| 打开 `/` 只看到构建提示 | 执行 `pnpm --dir app\frontend build`，然后重启服务。 |
-| 健康检查返回 `503` | 检查 `private/` 是否可写、数据库版本是否受支持；不要自动删除或替换数据库。 |
-| Agent 收到 `409` | 可能匹配到多条记录、状态冲突，或已结束记录收到新流程事件；需要由用户判断。 |
-| Agent 收到 `422` | 岗位身份、面试日期、测评计划/截止日期或其他校验字段缺失或不合法。 |
-| Outlook 提示需要重新授权 | 检查应用是否为公共客户端、重定向 URI 是否为 `http://localhost`、是否启用了委托 `Mail.Read`，然后在“邮件接入”中重新连接。 |
-| QQ/163 认证失败 | 确认已启用 IMAP 并生成单独的授权码/客户端密码，不要使用网页版登录密码。 |
-| 安全凭据库不可用 | 请在具有 Credential Manager 和 DPAPI 的 Windows 交互用户会话中运行；服务不会回退到明文保存。 |
-| 私有工作区检查失败 | 在不打印真实值的前提下，处理未替换占位符、附件声明、经历顺序或简历哈希变化。 |
-| 公开发布检查失败 | 停止发布，查看失败项并修正暂存内容，不要绕过检查。 |
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与[安全策略](SECURITY.md)，并查看[路线图](ROADMAP.md)。项目会优先保障本地安全和人工最终提交边界，而不是扩大自动化范围。
 
 ## 开源许可
 
-本项目采用 [MIT License](LICENSE) 发布。邮件接入复用成熟开源依赖，而不是嵌入完整第三方收件箱；详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目采用 [MIT License](LICENSE) 发布。尚未发布的变更记录在 [CHANGELOG.md](CHANGELOG.md)。

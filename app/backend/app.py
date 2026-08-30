@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
@@ -71,8 +71,11 @@ def _error_body(error: ApiError) -> dict:
     return body
 
 
+RuntimeMode = Literal["standard", "test", "demo"]
+
+
 @asynccontextmanager
-async def _lifespan(app: FastAPI):
+async def _mail_lifespan(app: FastAPI):
     service = app.state.mail_service
     await service.start()
     try:
@@ -81,34 +84,37 @@ async def _lifespan(app: FastAPI):
         await service.stop()
 
 
-def create_app(db_path: Path | None = None) -> FastAPI:
-    """Build the board API.
+def _build_app(paths: Paths, mode: RuntimeMode) -> FastAPI:
+    """Build one explicit runtime mode without weakening path boundaries."""
 
-    ``db_path`` injects a temporary database for tests; the production
-    entrypoint always uses ``private/applications.sqlite``.
-    """
-
-    if db_path is not None:
-        paths = Paths(
-            repository_root=db_path.parent.parent,
-            private_root=db_path.parent,
-        )
-    else:
-        paths = default_paths()
-
-    app = FastAPI(title="Career Application Board", lifespan=_lifespan)
+    mail_ingestion = mode != "demo"
+    app = FastAPI(
+        title="求职投递助手 / Career Application Assistant",
+        lifespan=_mail_lifespan if mail_ingestion else None,
+    )
     app.state.paths = paths
-    from .mail.service import MailService
+    app.state.mode = mode
+    app.state.synthetic_data = mode == "demo"
+    app.state.mail_ingestion = mail_ingestion
+    if mail_ingestion:
+        from .mail.service import MailService
 
-    app.state.mail_service = MailService(paths, scheduler_enabled=db_path is None)
+        app.state.mail_service = MailService(paths, scheduler_enabled=mode == "standard")
     app.add_middleware(RequestGuard)
 
-    from .routers import agent, applications, health, mail
+    from .routers import applications, health
 
     app.include_router(health.router)
     app.include_router(applications.router)
-    app.include_router(agent.router)
-    app.include_router(mail.router)
+    if mode == "demo":
+        from .routers import demo
+
+        app.include_router(demo.router)
+    else:
+        from .routers import agent, mail
+
+        app.include_router(agent.router)
+        app.include_router(mail.router)
 
     @app.exception_handler(ApiError)
     async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
@@ -156,11 +162,43 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             status_code=500, content={"code": CODE_UNKNOWN, "message": "Unexpected server error."}
         )
 
+    @app.api_route(
+        "/api/{unmatched_path:path}",
+        methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+        include_in_schema=False,
+    )
+    def unknown_api_route(unmatched_path: str) -> JSONResponse:
+        """Keep unknown API writes from falling through to the static-file mount."""
+
+        del unmatched_path
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
     dist = paths.frontend_dist
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=str(dist), html=True), name="frontend")
 
     return app
+
+
+def create_app() -> FastAPI:
+    """Build the standard service at the fixed private/applications.sqlite path."""
+
+    return _build_app(default_paths(), "standard")
+
+
+def create_test_app(paths: Paths) -> FastAPI:
+    """Build a test service with mail APIs enabled and its scheduler disabled."""
+
+    return _build_app(paths, "test")
+
+
+def create_demo_app(paths: Paths) -> FastAPI:
+    """Build an isolated synthetic-data service with no mail or Agent APIs."""
+
+    from .demo import validate_demo_paths
+
+    validate_demo_paths(paths)
+    return _build_app(paths, "demo")
 
 
 def init_database(paths: Paths) -> None:

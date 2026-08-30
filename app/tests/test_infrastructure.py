@@ -172,6 +172,10 @@ def test_health_reports_ok_schema_version(client) -> None:
     assert body["status"] == "ok"
     assert body["database"] == "available"
     assert body["schema_version"] == 3
+    assert body["service"] == "career-application-assistant"
+    assert body["mode"] == "test"
+    assert body["synthetic_data"] is False
+    assert body["mail_ingestion"] is True
 
 
 def test_health_returns_503_when_database_is_unavailable(client, private_root: Path) -> None:
@@ -184,6 +188,10 @@ def test_health_returns_503_when_database_is_unavailable(client, private_root: P
             "status": "degraded",
             "database": "unavailable",
             "schema_version": None,
+            "service": "career-application-assistant",
+            "mode": "test",
+            "synthetic_data": False,
+            "mail_ingestion": True,
         }
     finally:
         unavailable.rename(private_root)

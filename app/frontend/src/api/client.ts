@@ -101,6 +101,23 @@ export interface EventWriteResponse {
   event: ApplicationEvent
 }
 
+export type ServiceMode = 'standard' | 'test' | 'demo'
+
+export interface HealthResponse {
+  status: string
+  database: string
+  schema_version: number
+  service: 'career-application-assistant'
+  mode: ServiceMode
+  synthetic_data: boolean
+  mail_ingestion: boolean
+}
+
+export interface DemoResetResponse {
+  ok: true
+  records_seeded: number
+}
+
 export type MailProvider = 'outlook' | 'qq' | '163'
 export type HistoryWindow = 'new_only' | 'last_30_days' | 'last_90_days'
 export type MailAccountStatus =
@@ -296,8 +313,12 @@ function request<T = unknown>(path: string, init: RequestInit, signal?: AbortSig
     })
 }
 
-export function health(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>('/health', { method: 'GET' }, signal)
+export function health(signal?: AbortSignal): Promise<HealthResponse> {
+  return request<HealthResponse>('/health', { method: 'GET' }, signal)
+}
+
+export function resetDemo(signal?: AbortSignal): Promise<DemoResetResponse> {
+  return request<DemoResetResponse>('/demo/reset', { method: 'POST', body: '{}' }, signal)
 }
 
 export function listApplications(query: ListApplicationsQuery = {}): Promise<ListApplicationsResponse> {

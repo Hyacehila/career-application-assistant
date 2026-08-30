@@ -79,7 +79,14 @@ try {
         }
         try {
             $health = Invoke-RestMethod -Method Get -Uri $healthUrl -TimeoutSec 1
-            if ($health.status -eq 'ok' -and $health.database -eq 'available') {
+            if (
+                $health.status -eq 'ok' -and
+                $health.database -eq 'available' -and
+                $health.service -eq 'career-application-assistant' -and
+                $health.mode -eq 'test' -and
+                $health.synthetic_data -eq $false -and
+                $health.mail_ingestion -eq $true
+            ) {
                 $healthy = $true
                 break
             }
@@ -92,12 +99,15 @@ try {
     }
 
     $previousOutput = $env:BOARD_E2E_OUTPUT_DIR
+    $previousTestMode = $env:CAREER_APPLICATION_ASSISTANT_ALLOW_TEST_MODE
     try {
         $env:BOARD_E2E_OUTPUT_DIR = $artifactPath
+        $env:CAREER_APPLICATION_ASSISTANT_ALLOW_TEST_MODE = '1'
         & pnpm --dir $frontendRoot run test:e2e
         $testExitCode = $LASTEXITCODE
     } finally {
         $env:BOARD_E2E_OUTPUT_DIR = $previousOutput
+        $env:CAREER_APPLICATION_ASSISTANT_ALLOW_TEST_MODE = $previousTestMode
     }
 } catch {
     Write-Output "FAIL: $($_.Exception.Message)"

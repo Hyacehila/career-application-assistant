@@ -19,17 +19,22 @@ if (Test-Path -LiteralPath $privateRoot) {
     if (-not (Test-Path -LiteralPath $privateRoot -PathType Container)) {
         throw 'private exists and is not a directory.'
     }
-
-    $existingItems = @(Get-ChildItem -LiteralPath $privateRoot -Force)
-    if ($existingItems.Count -ne 0) {
-        throw 'private must be empty; existing files are never overwritten.'
-    }
 }
 else {
     New-Item -ItemType Directory -Path $privateRoot | Out-Null
 }
 
-Copy-Item -LiteralPath $templatePath -Destination $materialsPath
+if (Test-Path -LiteralPath $materialsPath) {
+    if (-not (Test-Path -LiteralPath $materialsPath -PathType Leaf)) {
+        throw 'private/resume_materials.md exists and is not a file.'
+    }
+
+    Write-Output 'RESULT: PASS'
+    Write-Output 'private/resume_materials.md is already initialized; existing content was not read or changed.'
+    exit 0
+}
+
+Copy-Item -LiteralPath $templatePath -Destination $materialsPath -ErrorAction Stop
 
 Write-Output 'RESULT: PASS'
 Write-Output 'Created private/resume_materials.md from the public placeholder template.'

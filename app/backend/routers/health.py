@@ -31,5 +31,9 @@ def health(request: Request) -> JSONResponse:
         "status": status,
         "database": "available" if status == "ok" else "unavailable",
         "schema_version": version if status == "ok" else None,
+        "service": "career-application-assistant",
+        "mode": request.app.state.mode,
+        "synthetic_data": request.app.state.synthetic_data,
+        "mail_ingestion": request.app.state.mail_ingestion,
     }
     return JSONResponse(status_code=200 if status == "ok" else 503, content=body)

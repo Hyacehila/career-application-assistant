@@ -11,6 +11,9 @@ import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
   view: ViewName;
+  mailAvailable: boolean;
+  demoMode: boolean;
+  demoResetting: boolean;
   search: string;
   stageGroup: string;
   type: string;
@@ -27,6 +30,7 @@ export interface AppShellProps {
   onCityChange: (value: string) => void;
   onSourceChange: (value: string) => void;
   onSortChange: (value: string) => void;
+  onDemoReset: () => void;
   children: ReactNode;
 }
 
@@ -38,6 +42,9 @@ const VIEW_ITEMS: Array<{ key: ViewName; label: string }> = [
 
 export default function AppShell({
   view,
+  mailAvailable,
+  demoMode,
+  demoResetting,
   search,
   stageGroup,
   type,
@@ -54,6 +61,7 @@ export default function AppShell({
   onCityChange,
   onSourceChange,
   onSortChange,
+  onDemoReset,
   children,
 }: AppShellProps) {
   const isMobile = useIsMobile();
@@ -77,9 +85,15 @@ export default function AppShell({
       <header className={styles.header}>
         <div className={styles.topRow}>
           <div className={styles.topLeft} data-testid="shell-top-left">
-            <span className={styles.productName}>投递看板</span>
+            <span
+              className={styles.productName}
+              aria-label="求职投递助手 / Career Application Assistant"
+            >
+              <span>求职投递助手</span>
+              <span className={styles.productNameEnglish}>/ Career Application Assistant</span>
+            </span>
             <nav className={styles.viewSwitcher} aria-label="视图切换">
-              {VIEW_ITEMS.map((item) => (
+              {VIEW_ITEMS.filter((item) => item.key !== "mail" || mailAvailable).map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -140,6 +154,23 @@ export default function AppShell({
           </div>
         ))}
       </header>
+      {demoMode ? (
+        <aside className={styles.demoNotice} data-testid="demo-notice" aria-label="合成演示数据">
+          <p>
+            <strong>合成演示数据</strong>
+            <span>所有公司、岗位和时间线均为虚构；操作只影响本次临时会话。</span>
+          </p>
+          <button
+            type="button"
+            className={styles.demoResetButton}
+            data-testid="demo-reset"
+            disabled={demoResetting}
+            onClick={onDemoReset}
+          >
+            {demoResetting ? "正在重置…" : "重置演示"}
+          </button>
+        </aside>
+      ) : null}
       <main className={styles.content} data-testid="shell-content">
         {children}
       </main>

@@ -1,95 +1,40 @@
-# Public application board
+# 求职投递助手 / Career Application Assistant
 
-This directory contains the public board code: a FastAPI service, a fixed
-SQLite data layer, and the React/Vite/TypeScript frontend. Keep personal
-materials and application records outside this directory; the database is
-always created at `private/applications.sqlite`.
+This directory contains the public FastAPI, SQLite, React, and test implementation. Personal materials and application records stay outside it. Standard mode always uses `private/applications.sqlite`.
 
-## Layout
+## Runtime entry points
 
-- `server.py` — user entrypoint. Validates the `private/` overlay, initializes
-  or migrates the fixed database, serves the API on `127.0.0.1:8000`, and serves
-  the built frontend from `app/frontend/dist` when present.
-- `backend/` — the FastAPI application factory, SQLite data layer, migrations,
-  application/agent/mail routers, and read-only Graph/IMAP ingestion modules.
-- `frontend/` — the Vite + React + TypeScript board UI (built to `frontend/dist`).
-- `tests/` — backend pytest suite plus a public simulated recruitment fixture;
-  all databases are injected under the system temp directory.
+- `server.py` starts standard mode on `127.0.0.1:8000`. It validates the fixed private overlay, initializes or migrates its database, enables the Agent and mail APIs, and serves `frontend/dist` when built.
+- `demo_server.py` starts synthetic demo mode on `127.0.0.1:8001`. It uses a validated system-temporary session directory, seeds six fictional records, and omits both Agent and mail routes.
+- `backend/` contains explicit standard, test, and demo application factories, migrations, the data store, API routers, and the read-only mail runtime.
+- `frontend/` contains the Vite, React, and TypeScript interface. A single production build is shared by standard and demo modes.
+- `tests/` contains backend and browser-loop tests. Test databases and fixtures must use validated temporary locations and must not open the standard database.
 
-## Run locally
+## Local commands
 
-Requires `uv` and `pnpm` on PATH, plus a Python 3.12+ interpreter.
+From the repository root:
 
 ```powershell
-# Backend: create the repo-local virtualenv and install pinned dependencies.
 uv venv .local\venv --python 3.12
 $env:UV_PROJECT_ENVIRONMENT = "$PWD\.local\venv"
-uv sync --extra dev
-
-# Frontend: install and build once.
-pnpm --dir app\frontend install
+uv sync --locked --extra dev
+pnpm --dir app\frontend install --frozen-lockfile
 pnpm --dir app\frontend build
 ```
 
-Then start the service with a single command from the repository root:
+Run standard mode after initializing the private overlay:
 
 ```powershell
+pwsh -NoProfile -File .\scripts\Initialize-PrivateOverlay.ps1
 .\.local\venv\Scripts\python.exe app\server.py
 ```
 
-Open `http://127.0.0.1:8000`. If the frontend is not built, the API still works
-and `/` shows a short public hint page.
-
-For the agent workflow, the service can be auto-started (idempotent) with:
+Run the isolated synthetic demo:
 
 ```powershell
-pwsh -NoProfile -File .\scripts\Start-BoardService.ps1
+pwsh -NoProfile -File .\scripts\Start-Demo.ps1
 ```
 
-Agents use the typed wrapper below instead of assembling raw HTTP JSON. It
-performs the health/start sequence and supports `FillCompleted` plus
-`StatusUpdate`; status matching accepts an exact active `ApplicationId` before
-falling back to URL or job metadata.
+The loopback-only API rejects non-JSON writes and unexpected host/origin values. Standard startup and the typed Agent wrapper validate the health response identity and reject demo mode. Demo mode does not construct the mail service and does not expose `/api/mail/*` or `/api/agent/*`.
 
-```powershell
-pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
-  -Action StatusUpdate -ApplicationId 42 `
-  -Stage assessment -EventDate 2026-08-29 `
-  -DeadlineDate 2026-09-01 -EventSource email_extract
-```
-
-The persistent browser regression uses a simulated recruitment form, a fake
-in-memory upload, the typed Agent wrapper, and an isolated temporary SQLite:
-
-```powershell
-pnpm --dir app\frontend exec playwright install chromium
-pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
-```
-
-The service binds loopback only. Write requests must be JSON, use a loopback
-`Host`, and, when an `Origin` header is present, come from that same loopback
-origin.
-
-## Mail ingestion runtime
-
-The third frontend view configures Outlook, QQ Mail, and 163 Mail without
-presenting an inbox. Outlook uses MSAL Python plus Microsoft Graph delegated
-`Mail.Read` and Inbox delta links. QQ/163 use IMAPClient over verified TLS on
-port 993, select Inbox read-only, and persist `UIDVALIDITY` plus the last UID.
-The production lifespan starts one APScheduler polling job; injected test
-databases disable it.
-
-This feature is Windows-only. IMAP authorization codes are stored in Windows
-Credential Manager. The MSAL token cache is encrypted through Windows DPAPI by
-`msal-extensions`; both mechanisms fail closed. Structured pending review
-candidates expire after 90 days. Message subjects, senders, bodies, attachments,
-meeting links, and verification codes are not database columns.
-
-## Data and privacy
-
-The only database file is `private/applications.sqlite`. It stores job metadata,
-stage events, the structured timeline, mail cursors, and the bounded structured
-review queue — never candidate names, phone numbers, addresses, mailbox
-credentials/tokens, form answers, attachment content, or raw email bodies.
-`AGENTS.md` is the authority for how the agent records applications and updates
-status; automation always stops before final submission.
+For setup, API details, verification, and troubleshooting, see [Development and API reference](../docs/development.md). Mail implementation and data boundaries are documented in [Mail ingestion](../docs/mail-ingestion.md) and [Security and privacy](../docs/security-and-privacy.md).

@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApplicationRecord, ApplicationDetail } from "../api/client";
 import { makeEvent, makeRecord } from "../test/fixtures";
-import { jsonBody, okBody } from "../test/http";
+import { jsonBody, okBody, STANDARD_HEALTH } from "../test/http";
 import App from "../App";
 import BoardView from "./BoardView";
 import DetailDrawer from "./DetailDrawer";
@@ -127,6 +127,7 @@ function stubDetailFetch() {
 function stubListFetch() {
   const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const path = String(input);
+    if (path === "/api/health") return Promise.resolve(jsonBody(STANDARD_HEALTH));
     if (path.includes("/applications")) {
       return Promise.resolve(
         jsonBody({
@@ -374,7 +375,7 @@ describe("响应式：AppShell 窄屏顶栏与筛选折叠", () => {
       expect(screen.getByTestId("mobile-filter-toggle")).toBeInTheDocument();
     });
     // 顶栏要素保留
-    expect(screen.getByText("投递看板")).toBeInTheDocument();
+    expect(screen.getByText("求职投递助手")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "看板" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "表格" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("搜索公司或岗位")).toBeInTheDocument();

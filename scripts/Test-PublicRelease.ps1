@@ -1,19 +1,121 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 
 [CmdletBinding()]
 param(
-    [switch] $Staged
+    [switch] $Staged,
+    [switch] $PolicySelfTest
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:FailureCount = 0
 
+$documentationFiles = @(
+    'README.md',
+    'README.zh-CN.md',
+    'CONTRIBUTING.md',
+    'SECURITY.md',
+    'ROADMAP.md',
+    'CHANGELOG.md',
+    'THIRD_PARTY_NOTICES.md',
+    'app/README.md',
+    'docs/README.md',
+    'docs/README.zh-CN.md',
+    'docs/getting-started.md',
+    'docs/getting-started.zh-CN.md',
+    'docs/application-workflow.md',
+    'docs/application-workflow.zh-CN.md',
+    'docs/mail-ingestion.md',
+    'docs/mail-ingestion.zh-CN.md',
+    'docs/security-and-privacy.md',
+    'docs/security-and-privacy.zh-CN.md',
+    'docs/development.md',
+    'docs/development.zh-CN.md'
+)
+
+$communityFiles = @(
+    'CONTRIBUTING.md',
+    'SECURITY.md',
+    'ROADMAP.md',
+    'CHANGELOG.md'
+)
+
+$githubFiles = @(
+    '.github/ISSUE_TEMPLATE/bug_report.yml',
+    '.github/ISSUE_TEMPLATE/feature_request.yml',
+    '.github/ISSUE_TEMPLATE/config.yml',
+    '.github/workflows/ci.yml'
+)
+
+$coreExactFiles = @(
+    '.gitignore',
+    'AGENTS.md',
+    'LICENSE',
+    'README.md',
+    'README.zh-CN.md',
+    'THIRD_PARTY_NOTICES.md',
+    'pyproject.toml',
+    'resume_materials.example.md',
+    'uv.lock'
+)
+
+$allowedExactFiles = @(
+    $coreExactFiles
+    $communityFiles
+    $documentationFiles | Where-Object { $_ -like 'docs/*' }
+    $githubFiles
+) | Select-Object -Unique
+
+$requiredFiles = @(
+    $coreExactFiles
+    $communityFiles
+    $documentationFiles | Where-Object { $_ -like 'docs/*' }
+    $githubFiles
+    'app/README.md',
+    'app/server.py',
+    'app/demo_server.py',
+    'app/backend/demo.py',
+    'app/backend/routers/demo.py',
+    'app/frontend/index.html',
+    'app/frontend/package.json',
+    'app/frontend/pnpm-lock.yaml',
+    'app/frontend/e2e/agent-fill.spec.ts',
+    'app/frontend/e2e/demo.playwright.config.ts',
+    'app/frontend/e2e/demo.spec.ts',
+    'app/frontend/e2e/playwright.config.ts',
+    'app/frontend/tsconfig.json',
+    'app/frontend/vite.config.ts',
+    'app/frontend/src/main.tsx',
+    'app/frontend/src/App.tsx',
+    'app/frontend/src/hooks/useServiceHealth.ts',
+    'app/frontend/src/productIdentity.test.ts',
+    'app/tests/e2e/mock_recruitment.html',
+    'app/tests/e2e/mock_server.py',
+    'app/tests/test_demo.py',
+    'app/tests/test_public_documentation.py',
+    'app/tests/test_public_scripts.py',
+    'app/tests/test_startup.py',
+    'scripts/Initialize-PrivateOverlay.ps1',
+    'scripts/Invoke-BoardAgent.ps1',
+    'scripts/Start-BoardService.ps1',
+    'scripts/Start-Demo.ps1',
+    'scripts/Test-AgentBrowserE2E.ps1',
+    'scripts/Test-Environment.ps1',
+    'scripts/Test-PrivateWorkspace.ps1',
+    'scripts/Test-PublicRelease.ps1'
+) | Select-Object -Unique
+
+$forbiddenPathPatterns = @(
+    '(^|/)resume_materials\.md$',
+    '(^|/)\.resume\.sha256$',
+    '(^|/)(private|private-workspace)(/|$)',
+    '\.(pdf|jpe?g|png|gif|webp|svg|docx?|sqlite3?|db|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)$'
+)
+
 function Write-CheckResult {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Name,
-
         [Parameter(Mandatory = $true)]
         [bool] $Passed
     )
@@ -27,39 +129,300 @@ function Write-CheckResult {
     Write-Output "FAIL: $Name"
 }
 
-function Get-IndexText {
+function Test-ForbiddenPath {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    foreach ($pattern in $forbiddenPathPatterns) {
+        if ($Path -match $pattern) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-AllowedPublicPath {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $normalized = $Path.Replace('\', '/')
+    if (Test-ForbiddenPath -Path $normalized) {
+        return $false
+    }
+    if ($normalized -in $allowedExactFiles) {
+        return $true
+    }
+    return $normalized.StartsWith('app/', [StringComparison]::Ordinal) -or
+        $normalized.StartsWith('scripts/', [StringComparison]::Ordinal)
+}
+
+function Test-BytePrefix {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $Path
+        [Parameter(Mandatory = $true)][byte[]] $Bytes,
+        [Parameter(Mandatory = $true)][byte[]] $Prefix,
+        [int] $Offset = 0
     )
+
+    if ($Bytes.Length -lt ($Offset + $Prefix.Length)) {
+        return $false
+    }
+    for ($index = 0; $index -lt $Prefix.Length; $index += 1) {
+        if ($Bytes[$Offset + $index] -ne $Prefix[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-MediaSignature {
+    param([AllowNull()][byte[]] $Bytes)
+
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) {
+        return $false
+    }
+
+    $binarySignatures = @(
+        [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+        [byte[]](0xff, 0xd8, 0xff),
+        [Text.Encoding]::ASCII.GetBytes('GIF87a'),
+        [Text.Encoding]::ASCII.GetBytes('GIF89a'),
+        [Text.Encoding]::ASCII.GetBytes('OggS'),
+        [Text.Encoding]::ASCII.GetBytes('fLaC'),
+        [Text.Encoding]::ASCII.GetBytes('ID3'),
+        [Text.Encoding]::ASCII.GetBytes('FLV'),
+        [Text.Encoding]::ASCII.GetBytes('MThd'),
+        [byte[]](0x1a, 0x45, 0xdf, 0xa3),
+        [byte[]](0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11, 0xa6, 0xd9, 0x00, 0xaa, 0x00, 0x62, 0xce, 0x6c),
+        [Text.Encoding]::ASCII.GetBytes('%PDF-')
+    )
+    foreach ($signature in $binarySignatures) {
+        if (Test-BytePrefix -Bytes $Bytes -Prefix $signature) {
+            return $true
+        }
+    }
+
+    if ($Bytes.Length -ge 12 -and (Test-BytePrefix -Bytes $Bytes -Prefix ([Text.Encoding]::ASCII.GetBytes('RIFF')))) {
+        $riffType = [Text.Encoding]::ASCII.GetString($Bytes, 8, 4)
+        if ($riffType -in @('WEBP', 'WAVE', 'AVI ')) {
+            return $true
+        }
+    }
+    if ($Bytes.Length -ge 8 -and [Text.Encoding]::ASCII.GetString($Bytes, 4, 4) -eq 'ftyp') {
+        return $true
+    }
+    if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xff -and $Bytes[1] -in @(0xfb, 0xf3, 0xf2)) {
+        return $true
+    }
+    if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xff -and $Bytes[1] -in @(0xf1, 0xf9)) {
+        return $true
+    }
+    if ($Bytes.Length -ge 4 -and (Test-BytePrefix -Bytes $Bytes -Prefix ([byte[]](0x00, 0x00, 0x01))) -and $Bytes[3] -in @(0xba, 0xb3)) {
+        return $true
+    }
+    if ($Bytes.Length -ge 12 -and (Test-BytePrefix -Bytes $Bytes -Prefix ([Text.Encoding]::ASCII.GetBytes('FORM')))) {
+        $formType = [Text.Encoding]::ASCII.GetString($Bytes, 8, 4)
+        if ($formType -in @('AIFF', 'AIFC')) {
+            return $true
+        }
+    }
+
+    $prefixLength = [Math]::Min($Bytes.Length, 4096)
+    $textPrefix = if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xff -and $Bytes[1] -eq 0xfe) {
+        [Text.Encoding]::Unicode.GetString($Bytes, 0, $prefixLength - ($prefixLength % 2))
+    } elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xfe -and $Bytes[1] -eq 0xff) {
+        [Text.Encoding]::BigEndianUnicode.GetString($Bytes, 0, $prefixLength - ($prefixLength % 2))
+    } elseif ($Bytes.Length -ge 4 -and $Bytes[1] -eq 0x00) {
+        [Text.Encoding]::Unicode.GetString($Bytes, 0, $prefixLength - ($prefixLength % 2))
+    } elseif ($Bytes.Length -ge 4 -and $Bytes[0] -eq 0x00) {
+        [Text.Encoding]::BigEndianUnicode.GetString($Bytes, 0, $prefixLength - ($prefixLength % 2))
+    } else {
+        [Text.Encoding]::UTF8.GetString($Bytes, 0, $prefixLength)
+    }
+    return $textPrefix -match '(?is)^(?:\uFEFF)?\s*(?:<\?xml[^>]*>\s*)?(?:<!--.*?-->\s*)*(?:<!DOCTYPE\s+svg[^>]*>\s*)?<svg\b'
+}
+
+function Test-DocumentationTextSafe {
+    param([AllowNull()][string] $Text)
+
+    if ($null -eq $Text) {
+        return $false
+    }
+
+    $forbiddenDocumentPatterns = @(
+        '(?im)!\[[^\]]*\]\s*(?:\([^)]*\)|\[[^\]]*\])',
+        '(?i)<\s*img\b',
+        '(?i)shields\.io',
+        '(?im)^\s*(?:```|~~~)\s*mermaid\b',
+        '(?i)\bclass\s*=\s*["'']mermaid["'']',
+        '(?i)\]\([^\)\r\n]*\.(?:png|jpe?g|gif|webp|svg|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)(?:[?#][^\)\r\n]*)?\)',
+        '(?i)<(?:https?://|\.\.?/)[^>\r\n]+\.(?:png|jpe?g|gif|webp|svg|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)(?:[?#][^>\r\n]*)?>',
+        '(?i)https?://[^\s<>\)]+\.(?:png|jpe?g|gif|webp|svg|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)(?:[?#][^\s<>\)]*)?'
+    )
+    foreach ($pattern in $forbiddenDocumentPatterns) {
+        if ($Text -match $pattern) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Invoke-PolicySelfTest {
+    $requiredPolicyPaths = @(
+        'app/demo_server.py',
+        'app/backend/demo.py',
+        'app/backend/routers/demo.py',
+        'scripts/Start-Demo.ps1',
+        'scripts/Test-Environment.ps1',
+        'app/frontend/e2e/demo.playwright.config.ts',
+        'app/frontend/e2e/demo.spec.ts',
+        'app/tests/test_demo.py',
+        'app/tests/test_public_documentation.py',
+        'app/tests/test_public_scripts.py',
+        'app/tests/test_startup.py'
+    ) + $communityFiles + ($documentationFiles | Where-Object { $_ -like 'docs/*' }) + $githubFiles
+
+    $allowedSamples = @(
+        'README.md',
+        'app/backend/app.py',
+        'scripts/Start-Demo.ps1',
+        'docs/security-and-privacy.zh-CN.md',
+        '.github/ISSUE_TEMPLATE/config.yml',
+        '.github/workflows/ci.yml'
+    )
+    $rejectedSamples = @(
+        'private/resume_materials.md',
+        'docs/unreviewed.md',
+        '.github/workflows/extra.yml',
+        '.github/PULL_REQUEST_TEMPLATE.md',
+        'app/demo.png',
+        'scripts/walkthrough.mp4'
+    )
+
+    Write-CheckResult -Name 'policy-allowlist-positive' -Passed (
+        @($allowedSamples | Where-Object { -not (Test-AllowedPublicPath -Path $_) }).Count -eq 0
+    )
+    Write-CheckResult -Name 'policy-allowlist-negative' -Passed (
+        @($rejectedSamples | Where-Object { Test-AllowedPublicPath -Path $_ }).Count -eq 0
+    )
+    Write-CheckResult -Name 'policy-required-paths' -Passed (
+        @($requiredPolicyPaths | Where-Object { $_ -notin $requiredFiles }).Count -eq 0
+    )
+
+    $mediaSamples = @(
+        [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+        [byte[]](0xff, 0xd8, 0xff, 0xe0),
+        [Text.Encoding]::ASCII.GetBytes('GIF89a fixture'),
+        [Text.Encoding]::ASCII.GetBytes('RIFF0000WEBP'),
+        [Text.Encoding]::UTF8.GetBytes('<?xml version="1.0"?><svg></svg>'),
+        [Text.Encoding]::Unicode.GetBytes('<svg></svg>'),
+        [Text.Encoding]::ASCII.GetBytes('0000ftypisom'),
+        [Text.Encoding]::ASCII.GetBytes('OggSfixture'),
+        [Text.Encoding]::ASCII.GetBytes('FLVfixture')
+    )
+    Write-CheckResult -Name 'policy-media-signatures-positive' -Passed (
+        @($mediaSamples | Where-Object { -not (Test-MediaSignature -Bytes $_) }).Count -eq 0
+    )
+    Write-CheckResult -Name 'policy-media-signatures-negative' -Passed (
+        -not (Test-MediaSignature -Bytes ([Text.Encoding]::UTF8.GetBytes('# Plain text')))
+    )
+
+    $unsafeDocuments = @(
+        '![preview](preview.png)',
+        '<img src="preview.example.test">',
+        '[status](https://img.shields.io/example)',
+        ('```mermaid' + "`n" + 'graph TD' + "`n" + '```'),
+        '[recording](walkthrough.webm)',
+        '<https://media.example.test/walkthrough.mp4>'
+    )
+    Write-CheckResult -Name 'policy-document-media-positive' -Passed (
+        Test-DocumentationTextSafe -Text '# Text-only documentation`n[Guide](docs/README.md)'
+    )
+    Write-CheckResult -Name 'policy-document-media-negative' -Passed (
+        @($unsafeDocuments | Where-Object { Test-DocumentationTextSafe -Text $_ }).Count -eq 0
+    )
+
+    if ($script:FailureCount -eq 0) {
+        Write-Output 'RESULT: PASS'
+        exit 0
+    }
+    Write-Output "RESULT: FAIL ($($script:FailureCount) checks)"
+    exit 1
+}
+
+if ($PolicySelfTest) {
+    Invoke-PolicySelfTest
+}
+
+function Get-IndexText {
+    param([Parameter(Mandatory = $true)][string] $Path)
 
     $contentLines = & git show (':' + $Path) 2>$null
     if ($LASTEXITCODE -ne 0) {
         return $null
     }
-
     return ($contentLines -join "`n")
 }
 
 function Get-WorkTreeText {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $Root,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Path
+        [Parameter(Mandatory = $true)][string] $Root,
+        [Parameter(Mandatory = $true)][string] $Path
     )
 
     $fullPath = Join-Path $Root $Path
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
         return $null
     }
-
     return Get-Content -LiteralPath $fullPath -Raw -Encoding UTF8
 }
 
-$gitCommand = Get-Command git -ErrorAction SilentlyContinue
-if ($null -eq $gitCommand) {
+function Get-IndexBytes {
+    param(
+        [Parameter(Mandatory = $true)][string] $Root,
+        [Parameter(Mandatory = $true)][string] $Path
+    )
+
+    if ($Path.Contains('"')) {
+        return $null
+    }
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    $startInfo.Arguments = "show --no-textconv `":$Path`""
+    $startInfo.WorkingDirectory = $Root
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    $memory = [IO.MemoryStream]::new()
+    try {
+        $null = $process.Start()
+        $process.StandardOutput.BaseStream.CopyTo($memory)
+        $null = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            return $null
+        }
+        return ,$memory.ToArray()
+    } finally {
+        $memory.Dispose()
+        $process.Dispose()
+    }
+}
+
+function Get-WorkTreeBytes {
+    param(
+        [Parameter(Mandatory = $true)][string] $Root,
+        [Parameter(Mandatory = $true)][string] $Path
+    )
+
+    $fullPath = Join-Path $Root $Path
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        return $null
+    }
+    return ,[IO.File]::ReadAllBytes($fullPath)
+}
+
+if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
     throw 'Git is required.'
 }
 
@@ -74,92 +437,41 @@ Set-Location -LiteralPath $repositoryRoot
 if ($Staged) {
     $stagedPaths = @(& git diff --cached --name-only --diff-filter=ACDMR)
     Write-CheckResult -Name 'staged-change-present' -Passed ($stagedPaths.Count -gt 0)
+    Write-CheckResult -Name 'staged-path-allowlist' -Passed (
+        @($stagedPaths | Where-Object { -not (Test-AllowedPublicPath -Path $_) }).Count -eq 0
+    )
 }
-
-$requiredFiles = @(
-    '.gitignore',
-    'AGENTS.md',
-    'LICENSE',
-    'README.md',
-    'README.zh-CN.md',
-    'THIRD_PARTY_NOTICES.md',
-    'pyproject.toml',
-    'resume_materials.example.md',
-    'uv.lock',
-    'app/README.md',
-    'app/server.py',
-    'app/frontend/index.html',
-    'app/frontend/package.json',
-    'app/frontend/pnpm-lock.yaml',
-    'app/frontend/e2e/agent-fill.spec.ts',
-    'app/frontend/e2e/playwright.config.ts',
-    'app/frontend/tsconfig.json',
-    'app/frontend/vite.config.ts',
-    'app/frontend/src/main.tsx',
-    'app/frontend/src/App.tsx',
-    'app/tests/e2e/mock_recruitment.html',
-    'app/tests/e2e/mock_server.py',
-    'scripts/Initialize-PrivateOverlay.ps1',
-    'scripts/Invoke-BoardAgent.ps1',
-    'scripts/Start-BoardService.ps1',
-    'scripts/Test-AgentBrowserE2E.ps1',
-    'scripts/Test-PrivateWorkspace.ps1',
-    'scripts/Test-PublicRelease.ps1'
-)
 
 $trackedFiles = @(& git ls-files) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object
 $missingRequiredFiles = @($requiredFiles | Where-Object { $_ -notin $trackedFiles })
 Write-CheckResult -Name 'required-public-files-present' -Passed ($missingRequiredFiles.Count -eq 0)
-
-$allowedPathPattern = '^(?:\.gitignore|AGENTS\.md|LICENSE|README\.md|README\.zh-CN\.md|THIRD_PARTY_NOTICES\.md|pyproject\.toml|resume_materials\.example\.md|uv\.lock|app/.*|scripts/.*)$'
-$unexpectedTrackedFiles = @($trackedFiles | Where-Object { $_ -notmatch $allowedPathPattern })
-Write-CheckResult -Name 'tracked-file-allowlist' -Passed ($unexpectedTrackedFiles.Count -eq 0)
-
-$forbiddenPathPatterns = @(
-    '(^|/)resume_materials\.md$',
-    '(^|/)\.resume\.sha256$',
-    '(^|/)(private|private-workspace)(/|$)',
-    '\.(pdf|jpe?g|png|docx?|sqlite3?|db)$'
+Write-CheckResult -Name 'tracked-file-allowlist' -Passed (
+    @($trackedFiles | Where-Object { -not (Test-AllowedPublicPath -Path $_) }).Count -eq 0
 )
 
-# Release checks cover all reachable objects, while emitting aggregate results
-# only, so a private path can never be approved merely because it is not present
-# in the current checkout.
 $historyObjectLines = @(& git rev-list --objects --all 2>$null)
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to inspect reachable Git objects.'
 }
-
 $historyPathsSafe = $true
 foreach ($historyObjectLine in $historyObjectLines) {
     $separatorIndex = $historyObjectLine.IndexOf(' ')
     if ($separatorIndex -lt 0) {
         continue
     }
-
     $historicalPath = $historyObjectLine.Substring($separatorIndex + 1)
-    foreach ($forbiddenPathPattern in $forbiddenPathPatterns) {
-        if ($historicalPath -match $forbiddenPathPattern) {
-            $historyPathsSafe = $false
-            break
-        }
+    if ([string]::IsNullOrWhiteSpace($historicalPath)) {
+        continue
     }
-    if (-not $historyPathsSafe) {
+    if (Test-ForbiddenPath -Path $historicalPath) {
+        $historyPathsSafe = $false
         break
     }
 }
-
 Write-CheckResult -Name 'reachable-objects-have-no-private-paths' -Passed $historyPathsSafe
 
 foreach ($trackedFile in $trackedFiles) {
-    $pathAllowed = $true
-    foreach ($forbiddenPathPattern in $forbiddenPathPatterns) {
-        if ($trackedFile -match $forbiddenPathPattern) {
-            $pathAllowed = $false
-            break
-        }
-    }
-    Write-CheckResult -Name "public-path:$trackedFile" -Passed $pathAllowed
+    Write-CheckResult -Name "public-path:$trackedFile" -Passed (-not (Test-ForbiddenPath -Path $trackedFile))
 }
 
 $untrackedLines = @(
@@ -176,32 +488,56 @@ $sensitivePatterns = @(
     '(?i)(?<![A-Za-z0-9])[A-Za-z]:\\(?:Users|Documents and Settings)\\[^\s\\]+',
     '(?i)(?:gh[pousr]_|sk-)[A-Za-z0-9_-]{20,}'
 )
+$sensitiveScanExempt = @('uv.lock', 'app/frontend/pnpm-lock.yaml', 'app/frontend/package-lock.json')
 
 foreach ($trackedFile in $trackedFiles) {
-    $extension = [System.IO.Path]::GetExtension($trackedFile).ToLowerInvariant()
+    [byte[]] $bytes = if ($Staged) {
+        Get-IndexBytes -Root $repositoryRoot -Path $trackedFile
+    } else {
+        Get-WorkTreeBytes -Root $repositoryRoot -Path $trackedFile
+    }
+    $signatureSafe = $null -ne $bytes -and -not (Test-MediaSignature -Bytes $bytes)
+    Write-CheckResult -Name "public-signature:$trackedFile" -Passed $signatureSafe
+
+    $extension = [IO.Path]::GetExtension($trackedFile).ToLowerInvariant()
     $isTextFile = $textExtensions -contains $extension -or $trackedFile -in @('LICENSE', '.gitignore')
     if (-not $isTextFile) {
         continue
     }
-
-    $sensitiveScanExempt = @('uv.lock', 'app/frontend/pnpm-lock.yaml', 'app/frontend/package-lock.json')
     if ($trackedFile -in $sensitiveScanExempt) {
         Write-CheckResult -Name "public-content:$trackedFile" -Passed $true
         continue
     }
 
-    $text = if ($Staged) { Get-IndexText -Path $trackedFile } else { Get-WorkTreeText -Root $repositoryRoot -Path $trackedFile }
+    $text = if ($Staged) {
+        Get-IndexText -Path $trackedFile
+    } else {
+        Get-WorkTreeText -Root $repositoryRoot -Path $trackedFile
+    }
     $contentSafe = $null -ne $text
     if ($contentSafe) {
-        foreach ($sensitivePattern in $sensitivePatterns) {
-            if ($text -match $sensitivePattern) {
+        foreach ($pattern in $sensitivePatterns) {
+            if ($text -match $pattern) {
                 $contentSafe = $false
                 break
             }
         }
     }
-
     Write-CheckResult -Name "public-content:$trackedFile" -Passed $contentSafe
+}
+
+foreach ($documentFile in $documentationFiles) {
+    if ($documentFile -notin $trackedFiles) {
+        continue
+    }
+    $documentText = if ($Staged) {
+        Get-IndexText -Path $documentFile
+    } else {
+        Get-WorkTreeText -Root $repositoryRoot -Path $documentFile
+    }
+    Write-CheckResult -Name "text-only-document:$documentFile" -Passed (
+        Test-DocumentationTextSafe -Text $documentText
+    )
 }
 
 $agentsText = if ($Staged) { Get-IndexText -Path 'AGENTS.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'AGENTS.md' }
@@ -229,10 +565,8 @@ $requiredAgentRules = @(
     'email_extract',
     'private/applications.sqlite'
 )
-
-foreach ($requiredAgentRule in $requiredAgentRules) {
-    $present = $null -ne $agentsText -and $agentsText.Contains($requiredAgentRule)
-    Write-CheckResult -Name 'required-agent-rule' -Passed $present
+foreach ($rule in $requiredAgentRules) {
+    Write-CheckResult -Name 'required-agent-rule' -Passed ($null -ne $agentsText -and $agentsText.Contains($rule))
 }
 
 $requiredE2ESafetyRules = @(
@@ -241,10 +575,8 @@ $requiredE2ESafetyRules = @(
     @{ Name = 'e2e-private-fields-not-persisted'; Text = $e2eSpecText; Snippet = "not.toContain('mock-resume.pdf')" },
     @{ Name = 'e2e-database-is-temp-isolated'; Text = $e2eServerText; Snippet = 'career-board-e2e-' }
 )
-
-foreach ($requiredE2ESafetyRule in $requiredE2ESafetyRules) {
-    $present = $null -ne $requiredE2ESafetyRule.Text -and $requiredE2ESafetyRule.Text.Contains($requiredE2ESafetyRule.Snippet)
-    Write-CheckResult -Name $requiredE2ESafetyRule.Name -Passed $present
+foreach ($rule in $requiredE2ESafetyRules) {
+    Write-CheckResult -Name $rule.Name -Passed ($null -ne $rule.Text -and $rule.Text.Contains($rule.Snippet))
 }
 
 $requiredMaterialSections = @(
@@ -258,10 +590,8 @@ $requiredMaterialSections = @(
     '### 简历附件替换授权',
     '### 声明与自愿披露授权'
 )
-
-foreach ($requiredMaterialSection in $requiredMaterialSections) {
-    $present = $null -ne $materialsText -and $materialsText.Contains($requiredMaterialSection)
-    Write-CheckResult -Name 'required-template-section' -Passed $present
+foreach ($section in $requiredMaterialSections) {
+    Write-CheckResult -Name 'required-template-section' -Passed ($null -ne $materialsText -and $materialsText.Contains($section))
 }
 
 $placeholderCount = if ($null -eq $materialsText) { 0 } else { [regex]::Matches($materialsText, '<[^>`r`n]+>').Count }

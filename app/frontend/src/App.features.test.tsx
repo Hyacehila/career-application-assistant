@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { ApplicationDetail } from './api/client'
 import { makeEvent, makeRecord } from './test/fixtures'
-import { jsonBody, okBody } from './test/http'
+import { jsonBody, okBody, STANDARD_HEALTH } from './test/http'
 import type { BoardGroup } from './lib/statuses'
 
 const record = makeRecord({ id: 1, company_name: '示例科技', job_title: '前端工程师' })
@@ -80,6 +80,7 @@ describe('App 核心交互', () => {
   it('写操作失败：显示带后端 message 的 Toast，卡片回滚到原列', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url === '/api/health') return Promise.resolve(jsonBody(STANDARD_HEALTH))
       if (url.startsWith('/api/applications?') && init?.method === 'GET') {
         return Promise.resolve(jsonBody(listPayload()))
       }
@@ -113,6 +114,7 @@ describe('App 核心交互', () => {
     let listCalls = 0
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url === '/api/health') return Promise.resolve(jsonBody(STANDARD_HEALTH))
       if (url.startsWith('/api/applications?') && init?.method === 'GET') {
         listCalls += 1
         return Promise.resolve(jsonBody(listPayload()))
@@ -155,6 +157,7 @@ describe('App 核心交互', () => {
     let listCalls = 0
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url === '/api/health') return Promise.resolve(jsonBody(STANDARD_HEALTH))
       if (url.startsWith('/api/applications?') && init?.method === 'GET') {
         listCalls += 1
         return Promise.resolve(jsonBody(listPayload()))
@@ -185,6 +188,7 @@ describe('App 核心交互', () => {
   it('点击卡片打开详情抽屉，ESC 关闭抽屉', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url === '/api/health') return Promise.resolve(jsonBody(STANDARD_HEALTH))
       if (url.startsWith('/api/applications?') && init?.method === 'GET') {
         return Promise.resolve(jsonBody(listPayload()))
       }

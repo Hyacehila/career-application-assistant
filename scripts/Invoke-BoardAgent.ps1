@@ -65,10 +65,22 @@ $startScript = Join-Path $PSScriptRoot 'Start-BoardService.ps1'
 function Test-BoardHealth {
     try {
         $health = Invoke-RestMethod -Method Get -Uri $healthUrl -TimeoutSec 2
+        $modeAllowed = (
+            $health.mode -eq 'standard' -or
+            (
+                $health.mode -eq 'test' -and
+                $env:CAREER_APPLICATION_ASSISTANT_ALLOW_TEST_MODE -eq '1'
+            )
+        )
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            [int] $health.schema_version -eq 3
+            [int] $health.schema_version -eq 3 -and
+            $health.service -eq 'career-application-assistant' -and
+            $modeAllowed -and
+            $health.mode -ne 'demo' -and
+            $health.synthetic_data -eq $false -and
+            $health.mail_ingestion -eq $true
         )
     } catch {
         return $false

@@ -80,9 +80,12 @@ def _run_agent_command(*arguments: str) -> subprocess.CompletedProcess[str]:
     pwsh = shutil.which("pwsh")
     if pwsh is None:
         pytest.skip("pwsh is required")
+    environment = os.environ.copy()
+    environment["CAREER_APPLICATION_ASSISTANT_ALLOW_TEST_MODE"] = "1"
     return subprocess.run(
         [pwsh, "-NoProfile", "-File", str(COMMAND_SCRIPT), *arguments],
         cwd=REPOSITORY_ROOT,
+        env=environment,
         capture_output=True,
         text=True,
         encoding="utf-8",

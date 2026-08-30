@@ -29,12 +29,22 @@
 }
 
 .productName {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   font-family: var(--font-family);
   font-size: var(--company-font-size);
   line-height: var(--company-line-height);
   font-weight: var(--company-font-weight);
   color: var(--color-text-primary);
   white-space: nowrap;
+}
+
+.productNameEnglish {
+  color: var(--color-text-secondary);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight);
 }
 
 .viewSwitcher {
@@ -121,6 +131,49 @@
   border-top: var(--border-width) solid var(--color-workspace-bg);
 }
 
+.demoNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 20px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+}
+
+.demoNotice p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.demoNotice strong {
+  color: var(--color-text-primary);
+  font-weight: var(--control-label-font-weight-strong);
+}
+
+.demoResetButton {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.demoResetButton:hover:not(:disabled) {
+  border-color: var(--color-text-secondary);
+}
+
+.demoResetButton:disabled {
+  color: var(--color-text-secondary);
+  cursor: wait;
+}
+
 .content {
   flex: 1;
   min-width: 0;
@@ -128,6 +181,13 @@
   background-color: var(--color-workspace-bg);
   padding: 20px;
 }
+
+@media (max-width: 1199px) {
+  .productNameEnglish {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
   .topRow {
     flex-wrap: wrap;
@@ -207,6 +267,15 @@
     border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-card);
     background-color: var(--color-surface);
+  }
+
+  .demoNotice {
+    align-items: flex-start;
+    padding: 9px 12px;
+  }
+
+  .demoResetButton {
+    min-height: 44px;
   }
 
 }

@@ -1,0 +1,44 @@
+name: Feature request / 功能建议
+description: Propose a bounded improvement that preserves local safety and human review. / 提出保持本地安全与人工复核的范围明确改进。
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests must preserve loopback-only operation, least privilege, private-data separation, and personal final submission.
+        建议必须保持仅限 loopback、最小权限、私密数据隔离和用户本人最终提交。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / 问题
+      description: What user problem should be solved? Do not include real candidate or mailbox data. / 要解决什么用户问题？请勿提供真实候选人或邮箱数据。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome / 期望结果
+      description: Describe observable behavior and a synthetic example. / 请描述可观察行为并提供合成示例。
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Safety and privacy impact / 安全与隐私影响
+      description: Explain data, network, credential, and final-submit implications. / 说明数据、网络、凭据和最终提交边界的影响。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 替代方案
+      description: Optional approaches or workarounds considered. / 可填写已考虑的替代方案或临时做法。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope check / 范围确认
+      options:
+        - label: The proposal does not automate final submission or unattended bulk applying. / 本建议不自动最终提交，也不支持无人值守海投。
+          required: true
+        - label: The proposal does not require public personal data or plaintext credentials. / 本建议不要求公开个人数据或明文凭据。
+          required: true

@@ -10,14 +10,13 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPOSITORY_ROOT / "app"
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from backend.app import create_app, init_database  # noqa: E402
+from backend.app import create_test_app, init_database  # noqa: E402
 from backend.config import Paths  # noqa: E402
 
 FIXTURE_PATH = Path(__file__).with_name("mock_recruitment.html")
@@ -44,15 +43,8 @@ def build_test_app(database_path: Path) -> FastAPI:
     paths = Paths(repository_root=REPOSITORY_ROOT, private_root=database_path.parent)
     init_database(paths)
 
-    board_app = create_app(db_path=database_path)
-    frontend_dist = REPOSITORY_ROOT / "app" / "frontend" / "dist"
-    if frontend_dist.is_dir():
-        board_app.mount(
-            "/",
-            StaticFiles(directory=str(frontend_dist), html=True),
-            name="e2e-frontend",
-        )
-    fixture_app = FastAPI(title="Career Board Browser E2E Fixture")
+    board_app = create_test_app(paths)
+    fixture_app = FastAPI(title="求职投递助手 / Career Application Assistant Browser E2E Fixture")
 
     @fixture_app.get("/mock-recruitment", response_class=HTMLResponse)
     def mock_recruitment() -> str:

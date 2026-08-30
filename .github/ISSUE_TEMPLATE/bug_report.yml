@@ -1,0 +1,65 @@
+name: Bug report / 缺陷报告
+description: Report a reproducible problem using synthetic, non-sensitive data. / 使用合成且非敏感的数据报告可复现问题。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include resumes, application databases, raw mail, credentials, tokens, or other personal data.
+        请勿提交简历、投递数据库、原始邮件、凭据、令牌或其他个人数据。
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area / 模块
+      options:
+        - Standard application / 正式应用
+        - Synthetic demo / 合成 Demo
+        - Agent workflow / Agent 工作流
+        - Read-only mail ingestion / 只读邮件接入
+        - Setup or release tooling / 初始化或发布工具
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? / 问题描述
+      description: Describe the observed behavior without personal or mailbox data. / 请在不提供个人或邮箱数据的前提下描述现象。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction / 合成复现步骤
+      description: Provide the smallest steps and fictional inputs needed to reproduce it. / 请提供最小步骤和虚构输入。
+      placeholder: "1. Start demo mode\n2. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 预期行为
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Revision / 版本
+      description: Commit identifier or branch name; do not include a local path. / 提供提交标识或分支名，不要填写本地路径。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: Windows, Python, Node, and pnpm versions only. / 只填写 Windows、Python、Node 和 pnpm 版本。
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check / 安全确认
+      options:
+        - label: I removed personal data, credentials, tokens, raw mail, and attachments. / 我已移除个人数据、凭据、令牌、原始邮件和附件。
+          required: true
+        - label: This report does not request automation of final submission. / 本报告不要求自动执行最终提交。
+          required: true

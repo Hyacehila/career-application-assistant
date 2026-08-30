@@ -20,7 +20,7 @@ BUILD_HINT = """<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Career Application Assistant</title>
+    <title>求职投递助手 / Career Application Assistant</title>
     <style>
       body {
         margin: 0;
@@ -37,7 +37,7 @@ BUILD_HINT = """<!doctype html>
   </head>
   <body>
     <main class="shell">
-      <h1>Career Application Assistant</h1>
+      <h1>求职投递助手 / Career Application Assistant</h1>
       <p>The board API is running at <code>/api</code>, but the production frontend build is missing.</p>
       <p>Build the frontend first: <code>pnpm --dir app/frontend install</code> and <code>pnpm --dir app/frontend build</code>, then restart this service.</p>
     </main>

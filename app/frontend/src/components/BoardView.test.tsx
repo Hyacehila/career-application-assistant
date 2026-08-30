@@ -137,7 +137,7 @@ describe('BoardView', () => {
         onEmptyNewRecord={() => {}}
       />,
     )
-    expect(screen.getByText('暂无投递记录')).toBeInTheDocument()
+    expect(screen.getByText('还没有申请记录')).toBeInTheDocument()
   })
 
   it('拖拽到“已投递”触发 onStatusChange 回调（参数为当前记录与目标分组）', async () => {

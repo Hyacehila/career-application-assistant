@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppShell from './components/AppShell'
 import BoardView from './components/BoardView'
 import ConfirmDialog from './components/ConfirmDialog'
@@ -8,8 +8,9 @@ import RecordFormDialog from './components/RecordFormDialog'
 import StatusFormDialog, { type StatusFormTarget } from './components/StatusFormDialog'
 import TableView from './components/TableView'
 import { ToastViewport, useToasts } from './components/Toast'
-import { postEvent, type ApplicationRecord } from './api/client'
+import { postEvent, resetDemo, type ApplicationRecord } from './api/client'
 import { useBoardQuery } from './hooks/useBoardQuery'
+import { useServiceHealth } from './hooks/useServiceHealth'
 import { useUrlState, type ViewName } from './hooks/useUrlState'
 import { todayDate } from './lib/dates'
 import type { BoardGroup } from './lib/statuses'
@@ -23,9 +24,17 @@ interface StatusTargetState {
 
 export default function App() {
   const [urlState, updateUrlState] = useUrlState()
+  const serviceHealth = useServiceHealth()
+  const isDemo = serviceHealth.data?.mode === 'demo'
+  const mailAvailable = serviceHealth.data?.mail_ingestion === true && !isDemo
+  const effectiveView: ViewName = urlState.view === 'mail' && !mailAvailable ? 'board' : urlState.view
+  const boardUrlState = useMemo(
+    () => effectiveView === urlState.view ? urlState : { ...urlState, view: effectiveView },
+    [effectiveView, urlState],
+  )
   const [searchDraft, setSearchDraft] = useState(urlState.q)
   const searchTimer = useRef<number | null>(null)
-  const boardQuery = useBoardQuery(urlState, urlState.view !== 'mail')
+  const boardQuery = useBoardQuery(boardUrlState, effectiveView !== 'mail')
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [recordFormOpen, setRecordFormOpen] = useState(false)
@@ -33,11 +42,18 @@ export default function App() {
   const [statusTarget, setStatusTarget] = useState<StatusTargetState | null>(null)
   const [confirmAppliedRecord, setConfirmAppliedRecord] = useState<ApplicationRecord | null>(null)
   const [detailVersion, setDetailVersion] = useState(0)
+  const [demoResetting, setDemoResetting] = useState(false)
   const { toasts, showToast } = useToasts()
 
   useEffect(() => {
     setSearchDraft(urlState.q)
   }, [urlState.q])
+
+  useEffect(() => {
+    if (serviceHealth.data && urlState.view === 'mail' && !mailAvailable) {
+      updateUrlState({ view: 'board' })
+    }
+  }, [mailAvailable, serviceHealth.data, updateUrlState, urlState.view])
 
   useEffect(
     () => () => {
@@ -113,7 +129,26 @@ export default function App() {
     showToast(message, 'error')
   }
 
-  const content = urlState.view === 'mail' ? (
+  const handleDemoReset = async () => {
+    setDemoResetting(true)
+    try {
+      await resetDemo()
+      setSelectedId(null)
+      setRecordFormOpen(false)
+      setEditingRecord(null)
+      setStatusTarget(null)
+      setConfirmAppliedRecord(null)
+      boardQuery.refetch()
+      setDetailVersion((value) => value + 1)
+      showToast('演示数据已重置', 'success')
+    } catch (error) {
+      handleError(error instanceof Error ? error.message : '重置演示数据失败')
+    } finally {
+      setDemoResetting(false)
+    }
+  }
+
+  const content = effectiveView === 'mail' ? (
     <MailIngestionView
       onNotify={showToast}
       onEventCommitted={() => {
@@ -121,7 +156,7 @@ export default function App() {
         setDetailVersion((value) => value + 1)
       }}
     />
-  ) : urlState.view === 'board' ? (
+  ) : effectiveView === 'board' ? (
       <BoardView
         items={boardQuery.data.items}
         loading={boardQuery.loading}
@@ -157,7 +192,10 @@ export default function App() {
   return (
     <>
       <AppShell
-        view={urlState.view}
+        view={effectiveView}
+        mailAvailable={mailAvailable}
+        demoMode={isDemo}
+        demoResetting={demoResetting}
         search={searchDraft}
         stageGroup={urlState.stageGroup}
         type={urlState.type}
@@ -174,6 +212,7 @@ export default function App() {
         onCityChange={(value) => updateUrlState({ city: value })}
         onSourceChange={(value) => updateUrlState({ source: value })}
         onSortChange={(value) => updateUrlState({ sort: value })}
+        onDemoReset={handleDemoReset}
       >
         {content}
       </AppShell>

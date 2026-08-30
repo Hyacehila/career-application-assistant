@@ -29,12 +29,12 @@ def db_path(private_root: Path) -> Path:
 
 @pytest.fixture
 def app(private_root: Path, db_path: Path):
-    from backend.app import create_app, init_database
+    from backend.app import create_test_app, init_database
     from backend.config import Paths
 
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     init_database(paths)
-    return create_app(db_path=db_path)
+    return create_test_app(paths)
 
 
 @pytest.fixture
