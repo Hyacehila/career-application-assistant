@@ -92,6 +92,47 @@ describe('DetailDrawer', () => {
     expect(screen.getByText('记录 #42')).toBeInTheDocument()
   })
 
+  it.each([
+    { status: 'applied', label: '已投递', source: 'user_confirmation' },
+    { status: 'offer', label: 'Offer', source: 'manual_ui' },
+  ] as const)('$label 记录保留历史 pending_review 节点，并统一显示为待确认投递', async ({ status, label, source }) => {
+    const progressedRecord = makeRecord({
+      id: 43,
+      company_name: '示例网络',
+      job_title: '后端工程师',
+      current_status: status,
+      submitted_at: '2026-08-17T10:00:00+08:00',
+    })
+    const detail: ApplicationDetail = {
+      application: progressedRecord,
+      events: [
+        makeEvent({ id: 21, stage: status, event_date: '2026-08-17', source, created_at: '2026-08-30T13:01:00+08:00' }),
+        makeEvent({ id: 20, stage: 'pending_review', event_date: '2026-08-30', source: 'agent_fill', created_at: '2026-08-30T13:00:00+08:00' }),
+      ],
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonBody(detail)))
+
+    render(
+      <DetailDrawer
+        recordId={43}
+        record={progressedRecord}
+        onClose={() => {}}
+        onUpdateStatus={() => {}}
+        onEdit={() => {}}
+        onDeleted={() => {}}
+        onError={() => {}}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drawer-current-status')).toHaveTextContent(label)
+    })
+    expect(screen.getByTestId('timeline-current')).toHaveTextContent(label)
+    expect(screen.getByText('待确认投递')).toBeInTheDocument()
+    expect(screen.queryByText('待人工复核')).not.toBeInTheDocument()
+    expect(screen.getByText('2026-08-30')).toBeInTheDocument()
+  })
+
   it('更多操作 → 软删除确认后调用 deleteApplication 并关闭抽屉', async () => {
     const fetchMock = stubFetch()
     const onDeleted = vi.fn()

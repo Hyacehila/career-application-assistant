@@ -37,7 +37,7 @@ export const STATUS_TO_BOARD_GROUP: Record<Status, BoardGroup> = {
 }
 
 export const STATUS_LABELS: Record<Status, string> = {
-  pending_review: '待人工复核',
+  pending_review: '待确认投递',
   applied: '已投递',
   assessment: '笔试 / 测评',
   interview_1: '1面',
@@ -50,7 +50,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 }
 
 export const BOARD_GROUP_LABELS: Record<BoardGroup, string> = {
-  pending_review: '待人工复核',
+  pending_review: '待确认投递',
   applied: '已投递',
   assessment: '笔试 / 测评',
   interview: '面试',

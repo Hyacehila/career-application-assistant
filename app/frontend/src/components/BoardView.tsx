@@ -5,9 +5,11 @@ import {
   MouseSensor,
   TouchSensor,
   pointerWithin,
+  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -23,6 +25,10 @@ import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import LoadingState from "./LoadingState";
 import styles from "./BoardView.module.css";
+
+const boardCollisionDetection: CollisionDetection = (args) => (
+  args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args)
+);
 
 export interface BoardViewProps {
   items: ApplicationRecord[];
@@ -258,7 +264,7 @@ export default function BoardView({
   if (items.length === 0) return <EmptyState onNewRecord={onEmptyNewRecord} />;
 
   if (isMobile) {
-    // 窄屏：五个固定阶段 chip + 当前阶段单列。未指定分组时默认显示待人工复核。
+    // 窄屏：五个固定阶段 chip + 当前阶段单列。未指定分组时默认显示待确认投递。
     const mobileGroup: BoardGroup = isBoardGroup(stageGroup) ? stageGroup : "pending_review";
     return (
       <div className={cn(styles.boardContainer, styles.boardMobile)}>
@@ -285,7 +291,7 @@ export default function BoardView({
         <StageTrack />
         <DndContext
           sensors={sensors}
-          collisionDetection={pointerWithin}
+          collisionDetection={boardCollisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}

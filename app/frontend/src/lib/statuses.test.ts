@@ -46,9 +46,10 @@ describe('statuses', () => {
   })
 
   it('中文显示名', () => {
-    expect(statusLabelOf('pending_review')).toBe('待人工复核')
+    expect(statusLabelOf('pending_review')).toBe('待确认投递')
     expect(statusLabelOf('interview_3')).toBe('3面')
     expect(statusLabelOf('offer')).toBe('Offer')
+    expect(BOARD_GROUP_LABELS.pending_review).toBe('待确认投递')
     expect(BOARD_GROUP_LABELS.assessment).toBe('笔试 / 测评')
     expect(BOARD_GROUP_LABELS.interview).toBe('面试')
     expect(BOARD_GROUP_LABELS.ended).toBe('已结束')

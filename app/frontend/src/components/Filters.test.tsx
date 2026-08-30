@@ -23,6 +23,8 @@ describe('Filters', () => {
     )
     const select = screen.getByLabelText('状态分组')
     expect(select).toHaveValue('ended')
+    expect(screen.getByRole('option', { name: '待确认投递' })).toHaveValue('pending_review')
+    expect(screen.queryByRole('option', { name: '待人工复核' })).not.toBeInTheDocument()
     await userEvent.setup().selectOptions(select, 'interview')
     expect(onStageGroupChange).toHaveBeenCalledWith('interview')
   })

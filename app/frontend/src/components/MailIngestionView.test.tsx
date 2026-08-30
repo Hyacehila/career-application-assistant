@@ -104,6 +104,15 @@ afterEach(() => {
 })
 
 describe('MailIngestionView', () => {
+  it('邮件结构化复核继续使用待人工复核文案', async () => {
+    setupFetch([])
+    render(<MailIngestionView onNotify={vi.fn()} onEventCommitted={vi.fn()} />)
+
+    expect(await screen.findByLabelText('待人工复核总数')).toHaveTextContent('待人工复核')
+    expect(screen.getByRole('heading', { name: '待人工复核' })).toBeInTheDocument()
+    expect(screen.queryByText('待确认投递')).not.toBeInTheDocument()
+  })
+
   it('首次账户状态加载失败时不显示可操作的未连接卡片', async () => {
     setupFetch([], (url, init) => {
       if (url === '/api/mail/accounts' && init?.method === 'GET') {

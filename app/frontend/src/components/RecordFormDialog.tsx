@@ -267,7 +267,7 @@ export default function RecordFormDialog({
             />
           </FormField>
         </div>
-        {mode === 'create' && <p className="formHint">新增记录默认进入“待人工复核”，状态只能通过后续事件更新。</p>}
+        {mode === 'create' && <p className="formHint">新增记录默认进入“待确认投递”，状态只能通过后续事件更新。</p>}
         {mode === 'edit' && <p className="formHint">这里只能修改岗位元数据；状态变化请使用“更新状态”。</p>}
         <div className="dialogActions">
           <button type="button" className="secondaryButton" onClick={onClose} disabled={pending}>

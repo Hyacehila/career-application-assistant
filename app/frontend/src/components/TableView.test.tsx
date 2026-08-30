@@ -113,7 +113,7 @@ describe('TableView', () => {
 
   it('当前阶段显示语义色状态点与标签，投递日期缺省显示 —', () => {
     render(<TableView {...baseProps()} />)
-    expect(screen.getByTestId('table-row-1')).toHaveTextContent('待人工复核')
+    expect(screen.getByTestId('table-row-1')).toHaveTextContent('待确认投递')
     expect(screen.getByTestId('table-row-2')).toHaveTextContent('已投递')
     expect(screen.getByTestId('table-row-2')).toHaveTextContent('2026-08-10')
     expect(screen.getByTestId('table-row-1')).toHaveTextContent('—')

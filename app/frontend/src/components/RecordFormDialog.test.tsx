@@ -14,6 +14,7 @@ describe('RecordFormDialog', () => {
   it('新增模式：公司/岗位为空时提交按钮禁用', () => {
     render(<RecordFormDialog mode="create" onClose={() => {}} />)
     expect(screen.getByText('新增记录')).toBeInTheDocument()
+    expect(screen.getByText(/默认进入“待确认投递”/)).toBeInTheDocument()
     const submit = screen.getByTestId('record-form-submit')
     expect(submit).toBeDisabled()
   })

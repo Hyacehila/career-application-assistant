@@ -111,7 +111,7 @@ describe('StatusFormDialog', () => {
   it('free 模式默认选中当前状态，10 个状态按分组可勾选', () => {
     setup('free', makeRecord({ id: 9, current_status: 'interview_1' }))
     expect(screen.getByRole('radio', { name: '1面' })).toBeChecked()
-    expect(screen.getByRole('radio', { name: '待人工复核' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: '待确认投递' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'HR面' })).toBeInTheDocument()
   })
 

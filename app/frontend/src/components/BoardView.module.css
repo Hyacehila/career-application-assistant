@@ -144,11 +144,13 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  min-height: 44px;
+  box-sizing: border-box;
   background-color: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 12px;
+  padding: 10px 12px;
   cursor: grab;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
@@ -176,18 +178,16 @@
 .cardTop {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.fieldLabel {
-  font-family: var(--font-family);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
+  gap: 4px;
+  min-width: 0;
 }
 
 .company {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-family);
   font-size: var(--company-font-size);
   line-height: var(--company-line-height);
@@ -196,48 +196,17 @@
 }
 
 .job {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-family: var(--font-family);
   font-size: var(--job-font-size);
   line-height: var(--job-line-height);
   font-weight: var(--job-font-weight);
   color: var(--color-text-primary);
-}
-
-.highlight {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--font-family);
-  font-size: var(--aux-font-size);
-  line-height: var(--aux-line-height);
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background-color: var(--color-workspace-bg);
-}
-
-.secondary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  font-family: var(--font-family);
-  font-size: var(--aux-font-size);
-  line-height: var(--aux-line-height);
-  color: var(--color-text-secondary);
-}
-
-.metaItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.metaItem svg {
-  flex: 0 0 auto;
-}
-
-.updated {
-  color: var(--color-text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -332,20 +301,7 @@
   }
 
   .mobileColumn .card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px 12px;
-    min-height: 112px;
-    padding: 14px 16px;
-  }
-
-  .mobileColumn .highlight {
-    justify-self: end;
-  }
-
-  .mobileColumn .secondary {
-    grid-column: 1 / -1;
+    min-height: 44px;
   }
 }
 

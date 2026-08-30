@@ -106,7 +106,7 @@ describe('App 核心交互', () => {
     await vi.waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
-    expect(screen.getByRole('region', { name: '待人工复核' })).toHaveTextContent('示例科技')
+    expect(screen.getByRole('region', { name: '待确认投递' })).toHaveTextContent('示例科技')
     expect(screen.getByRole('region', { name: '笔试 / 测评' })).not.toHaveTextContent('示例科技')
   })
 
@@ -203,7 +203,7 @@ describe('App 核心交互', () => {
     const card = await screen.findByTestId('board-card-1')
     await user.click(card)
     const status = await screen.findByTestId('drawer-current-status')
-    expect(status).toHaveTextContent('待人工复核')
+    expect(status).toHaveTextContent('待确认投递')
     await act(async () => {
       fireEvent.keyDown(document, { key: 'Escape' })
       await new Promise((resolve) => setTimeout(resolve, 240))

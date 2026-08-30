@@ -28,7 +28,7 @@ pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
   -JobUrl 'https://jobs.example.test/example-001'
 ```
 
-The wrapper verifies that the fixed loopback service has the expected identity and standard mode. `FillCompleted` is idempotent and creates or matches a `pending_review` record. It never means submitted and cannot append `applied`.
+The wrapper verifies that the fixed loopback service has the expected identity and standard mode. `FillCompleted` is idempotent and creates or matches a `pending_review` record. The board labels this status **Awaiting submission confirmation**: the form is prepared, but it still awaits your personal review and confirmation of final submission. This is an expected workflow state, not a query or data error. It never means submitted and cannot append `applied`.
 
 You then review every field and attachment and personally perform the final submission.
 
@@ -53,7 +53,7 @@ The timeline uses ten statuses grouped into five board columns:
 
 | Board column | Statuses |
 | --- | --- |
-| Pending review | `pending_review` |
+| Awaiting submission confirmation | `pending_review` |
 | Applied | `applied` |
 | Assessment | `assessment` |
 | Interview | `interview_1`, `interview_2`, `interview_3`, `interview_hr` |

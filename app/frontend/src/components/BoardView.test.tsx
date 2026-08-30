@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardGroup } from '../lib/statuses'
@@ -36,9 +36,9 @@ function layoutColumns() {
       left: index * 300,
       top: 0,
       width: 280,
-      height: 120,
+      height: 180,
       right: index * 300 + 280,
-      bottom: 120,
+      bottom: 180,
       x: index * 300,
       y: 0,
       toJSON: () => ({}),
@@ -68,10 +68,10 @@ describe('BoardView', () => {
   it('渲染五个固定顺序的阶段列与计数', () => {
     render(
       <BoardView
-        items={[makeRecord({ id: 1 })]}
+        items={[makeRecord({ id: 1, current_status: 'applied' })]}
         loading={false}
         error={null}
-        counts={{ ...baseCounts, pending_review: 1 }}
+        counts={{ ...baseCounts, applied: 1 }}
         stageGroup=""
         selectedId={null}
         onOpen={() => {}}
@@ -80,23 +80,24 @@ describe('BoardView', () => {
         onStatusChange={() => {}}
       />,
     )
-    const labels = ['待人工复核', '已投递', '笔试 / 测评', '面试', '已结束']
+    const labels = ['待确认投递', '已投递', '笔试 / 测评', '面试', '已结束']
     labels.forEach((label) => {
       expect(screen.getByRole('region', { name: label })).toBeInTheDocument()
     })
-    const pendingColumn = screen.getByRole('region', { name: '待人工复核' })
-    expect(pendingColumn).toHaveTextContent('待人工复核')
-    expect(pendingColumn).toHaveTextContent('1')
+    const pendingColumn = screen.getByRole('region', { name: '待确认投递' })
+    expect(pendingColumn).toHaveTextContent('待确认投递')
+    expect(pendingColumn).toHaveTextContent('0')
+    expect(pendingColumn).toHaveTextContent('暂无记录')
     expect(screen.getAllByText('暂无记录').length).toBe(4)
   })
 
-  it('按 current_status 把卡片分组到正确列，面试列显示轮次', () => {
+  it('按 current_status 正确分组，并让所有阶段卡片只显示公司名和岗位名', () => {
     const records = [
-      makeRecord({ id: 1, company_name: '示例科技', current_status: 'pending_review' }),
-      makeRecord({ id: 2, company_name: '示例网络', current_status: 'applied' }),
-      makeRecord({ id: 3, company_name: '示例云', current_status: 'interview_1' }),
-      makeRecord({ id: 4, company_name: '示例数据', current_status: 'offer' }),
-      makeRecord({ id: 5, company_name: '示例安全', current_status: 'assessment' }),
+      makeRecord({ id: 1, company_name: '示例科技', job_title: '前端工程师', current_status: 'pending_review' }),
+      makeRecord({ id: 2, company_name: '示例网络', job_title: '后端工程师', current_status: 'applied' }),
+      makeRecord({ id: 3, company_name: '示例云', job_title: '算法工程师', current_status: 'interview_1' }),
+      makeRecord({ id: 4, company_name: '示例数据', job_title: '数据工程师', current_status: 'offer' }),
+      makeRecord({ id: 5, company_name: '示例安全', job_title: '安全工程师', current_status: 'assessment', next_action_date: '2026-09-01' }),
     ]
     render(
       <BoardView
@@ -112,13 +113,29 @@ describe('BoardView', () => {
         onStatusChange={() => {}}
       />,
     )
-    expect(screen.getByRole('region', { name: '待人工复核' })).toHaveTextContent('示例科技')
+    expect(screen.getByRole('region', { name: '待确认投递' })).toHaveTextContent('示例科技')
     expect(screen.getByRole('region', { name: '已投递' })).toHaveTextContent('示例网络')
-    const interviewColumn = screen.getByRole('region', { name: '面试' })
-    expect(interviewColumn).toHaveTextContent('示例云')
-    expect(interviewColumn).toHaveTextContent('1面')
-    expect(screen.getByRole('region', { name: '已结束' })).toHaveTextContent('Offer')
+    expect(screen.getByRole('region', { name: '面试' })).toHaveTextContent('示例云')
+    expect(screen.getByRole('region', { name: '已结束' })).toHaveTextContent('示例数据')
     expect(screen.getByRole('region', { name: '笔试 / 测评' })).toHaveTextContent('示例安全')
+
+    for (const record of records) {
+      const card = screen.getByTestId(`board-card-${record.id}`)
+      expect(card).toHaveTextContent(record.company_name)
+      expect(card).toHaveTextContent(record.job_title)
+      expect(card).toHaveAttribute('aria-label', `${record.company_name} ${record.job_title}`)
+      expect(card).toHaveAttribute('title', `${record.company_name} · ${record.job_title}`)
+      expect(within(card).queryByText('公司', { exact: true })).not.toBeInTheDocument()
+      expect(within(card).queryByText('岗位', { exact: true })).not.toBeInTheDocument()
+      expect(card).not.toHaveTextContent('上海')
+      expect(card).not.toHaveTextContent('校招')
+      expect(card).not.toHaveTextContent('官方网站')
+      expect(card).not.toHaveTextContent('更新')
+      expect(screen.queryByTestId(`board-card-highlight-${record.id}`)).not.toBeInTheDocument()
+    }
+    expect(screen.getByTestId('board-card-3')).not.toHaveTextContent('1面')
+    expect(screen.getByTestId('board-card-4')).not.toHaveTextContent('Offer')
+    expect(screen.getByTestId('board-card-5')).not.toHaveTextContent('计划')
   })
 
   it('空数据库时整板显示 EmptyState', () => {
@@ -143,6 +160,7 @@ describe('BoardView', () => {
   it('拖拽到“已投递”触发 onStatusChange 回调（参数为当前记录与目标分组）', async () => {
     const record = makeRecord({ id: 7, company_name: '示例科技' })
     const onStatusChange = vi.fn()
+    const onOpen = vi.fn()
     render(
       <BoardView
         items={[record]}
@@ -151,7 +169,7 @@ describe('BoardView', () => {
         counts={{ ...baseCounts, pending_review: 1 }}
         stageGroup=""
         selectedId={null}
-        onOpen={() => {}}
+        onOpen={onOpen}
         onNewRecord={() => {}}
         onRetry={() => {}}
         onStatusChange={onStatusChange}
@@ -163,6 +181,7 @@ describe('BoardView', () => {
       expect(onStatusChange).toHaveBeenCalledTimes(1)
       expect(onStatusChange).toHaveBeenCalledWith(record, 'applied')
     })
+    expect(onOpen).not.toHaveBeenCalled()
   })
 
   it('拖拽到“面试”打开面试表单，显示轮次与必填日期', async () => {
@@ -202,10 +221,13 @@ describe('BoardView', () => {
     expect(onStatusChange).toHaveBeenCalledWith(record, 'interview')
   })
 
-  it('键盘传感器启用：卡片可聚焦，Space 开始、Esc 取消不报错', async () => {
+  it.each([
+    ['Space', ' ', 'Space'],
+    ['Enter', 'Enter', 'Enter'],
+  ])('键盘传感器可用 Space 启动并用 %s 落下卡片', async (_label, dropKey, dropCode) => {
     const record = makeRecord({ id: 9, company_name: '示例科技' })
     const onStatusChange = vi.fn()
-    const user = userEvent.setup()
+    const onOpen = vi.fn()
     render(
       <BoardView
         items={[record]}
@@ -214,7 +236,7 @@ describe('BoardView', () => {
         counts={{ ...baseCounts, pending_review: 1 }}
         stageGroup=""
         selectedId={null}
-        onOpen={() => {}}
+        onOpen={onOpen}
         onNewRecord={() => {}}
         onRetry={() => {}}
         onStatusChange={onStatusChange}
@@ -223,9 +245,60 @@ describe('BoardView', () => {
     const card = screen.getByTestId('board-card-9')
     expect(card).toHaveAttribute('role', 'button')
     expect(card).toHaveAttribute('aria-roledescription', 'draggable')
+    layoutColumns()
+    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+      left: 4,
+      top: 40,
+      width: 272,
+      height: 72,
+      right: 276,
+      bottom: 112,
+      x: 4,
+      y: 40,
+      toJSON: () => ({}),
+    } as DOMRect)
     card.focus()
-    await user.keyboard(' ')
-    await user.keyboard('{Escape}')
+    await act(async () => {
+      fireEvent.keyDown(card, { key: ' ', code: 'Space' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    for (let step = 0; step < 12; step += 1) {
+      await act(async () => {
+        fireEvent.keyDown(document, { key: 'ArrowRight', code: 'ArrowRight' })
+      })
+    }
+    await act(async () => {
+      fireEvent.keyDown(document, { key: dropKey, code: dropCode })
+    })
+    await waitFor(() => {
+      expect(onStatusChange).toHaveBeenCalledWith(record, 'applied')
+    })
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('Enter 只打开详情，不启动键盘拖拽', () => {
+    const record = makeRecord({ id: 10, company_name: '示例网络' })
+    const onOpen = vi.fn()
+    const onStatusChange = vi.fn()
+    render(
+      <BoardView
+        items={[record]}
+        loading={false}
+        error={null}
+        counts={{ ...baseCounts, pending_review: 1 }}
+        stageGroup=""
+        selectedId={null}
+        onOpen={onOpen}
+        onNewRecord={() => {}}
+        onRetry={() => {}}
+        onStatusChange={onStatusChange}
+      />,
+    )
+
+    const card = screen.getByTestId('board-card-10')
+    card.focus()
+    fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith(10)
     expect(onStatusChange).not.toHaveBeenCalled()
   })
 })

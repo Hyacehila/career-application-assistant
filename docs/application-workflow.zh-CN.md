@@ -14,7 +14,7 @@
 
 复核摘要不展示敏感值，只列出已填写模块、已上传附件名称、声明类别、仍需确认的问题，以及最终提交控件的位置或名称。
 
-## 记录待复核状态
+## 记录待确认投递状态
 
 输出复核摘要前，Codex 使用类型化封装命令，不直接操作 SQL，也不拼接任意 HTTP：
 
@@ -28,7 +28,7 @@ pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
   -JobUrl 'https://jobs.example.test/example-001'
 ```
 
-封装命令会确认固定 loopback 服务的身份和正式模式。`FillCompleted` 是幂等操作，只会建立或匹配 `pending_review` 记录。它不代表已投递，也不能追加 `applied`。
+封装命令会确认固定 loopback 服务的身份和正式模式。`FillCompleted` 是幂等操作，只会建立或匹配 `pending_review` 记录。看板将这个状态显示为“待确认投递”：表单已准备完成，但仍等待你亲自复核并确认最终提交。这是正常的流程状态，不是查询或数据异常；它不代表已投递，也不能追加 `applied`。
 
 接下来由你逐项复核字段与附件，并亲自完成最终提交。
 
@@ -53,7 +53,7 @@ pwsh -NoProfile -File .\scripts\Invoke-BoardAgent.ps1 `
 
 | 看板分组 | 状态 |
 | --- | --- |
-| 待复核 | `pending_review` |
+| 待确认投递 | `pending_review` |
 | 已投递 | `applied` |
 | 测评 | `assessment` |
 | 面试 | `interview_1`、`interview_2`、`interview_3`、`interview_hr` |

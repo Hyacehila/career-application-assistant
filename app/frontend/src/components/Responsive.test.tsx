@@ -171,7 +171,7 @@ describe("响应式：窄屏（max-width 767px）", () => {
     expect(screen.getByTestId("stage-chip-interview")).toHaveTextContent("1");
     expect(screen.getByTestId("stage-chip-ended")).toHaveTextContent("0");
     // 单列：stageGroup 为空时默认显示 pending_review 列
-    expect(screen.getByRole("region", { name: "待人工复核" })).toHaveTextContent("示例科技");
+    expect(screen.getByRole("region", { name: "待确认投递" })).toHaveTextContent("示例科技");
     // 不再有五列 region
     expect(screen.queryByRole("region", { name: "已投递" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "笔试 / 测评" })).not.toBeInTheDocument();
@@ -202,6 +202,28 @@ describe("响应式：窄屏（max-width 767px）", () => {
     expect(onStageGroupChange).toHaveBeenCalledWith("interview");
   });
 
+  it("统一紧凑卡片在窄屏保留触控高度，并限制公司与岗位行数", () => {
+    const css = readFileSync(path.join(process.cwd(), "src/components/BoardView.module.css"), "utf8");
+    const cardRule = css.match(/\.card\s*\{([^}]*)\}/s)?.[1];
+    const companyRule = css.match(/\.company\s*\{([^}]*)\}/s)?.[1];
+    const jobRule = css.match(/\.job\s*\{([^}]*)\}/s)?.[1];
+    const mobileCardRule = css.match(/\.mobileColumn \.card\s*\{([^}]*)\}/s)?.[1];
+
+    expect(cardRule).toBeDefined();
+    expect(cardRule).toContain("gap: 4px");
+    expect(cardRule).toContain("min-height: 44px");
+    expect(cardRule).toContain("padding: 10px 12px");
+    expect(companyRule).toContain("white-space: nowrap");
+    expect(companyRule).toContain("text-overflow: ellipsis");
+    expect(companyRule).toContain("overflow: hidden");
+    expect(jobRule).toContain("-webkit-line-clamp: 2");
+    expect(jobRule).toContain("-webkit-box-orient: vertical");
+    expect(jobRule).toContain("overflow: hidden");
+    expect(mobileCardRule).toContain("min-height: 44px");
+    expect(mobileCardRule).not.toContain("grid-template-columns");
+    expect(css).not.toContain("min-height: 112px");
+  });
+
   it("表格渲染紧凑行：无九列 columnheader，保留行点击与分页条", async () => {
     mockMedia(true);
     const onOpen = vi.fn();
@@ -225,7 +247,7 @@ describe("响应式：窄屏（max-width 767px）", () => {
     const row = screen.getByTestId("table-row-1");
     expect(row).toHaveTextContent("示例科技");
     expect(row).toHaveTextContent("前端工程师");
-    expect(row).toHaveTextContent("待人工复核");
+    expect(row).toHaveTextContent("待确认投递");
     // 选中态指示
     const selectedRow = screen.getByTestId("table-row-2");
     expect(selectedRow.className).toContain("mobileRowSelected");
@@ -303,7 +325,7 @@ describe("响应式：桌面（max-width 767px 不匹配）回归", () => {
     mockMedia(false);
     render(<BoardView {...boardProps()} />);
     expect(screen.queryByTestId("stage-chip-row")).not.toBeInTheDocument();
-    ["待人工复核", "已投递", "笔试 / 测评", "面试", "已结束"].forEach((label) => {
+    ["待确认投递", "已投递", "笔试 / 测评", "面试", "已结束"].forEach((label) => {
       expect(screen.getByRole("region", { name: label })).toBeInTheDocument();
     });
     ["pending_review", "applied", "assessment", "interview", "ended"].forEach((group) => {
@@ -411,7 +433,7 @@ describe("响应式：AppShell 窄屏顶栏与筛选折叠", () => {
       expect(screen.getByTestId("stage-chip-row")).toBeInTheDocument();
     });
     // stageGroup 为空时默认 pending_review 列
-    expect(screen.getByRole("region", { name: "待人工复核" })).toHaveTextContent("示例科技");
+    expect(screen.getByRole("region", { name: "待确认投递" })).toHaveTextContent("示例科技");
     await user.click(screen.getByTestId("stage-chip-applied"));
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "已投递" })).toHaveTextContent("示例网络");
