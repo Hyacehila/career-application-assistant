@@ -50,6 +50,31 @@ describe('App 壳', () => {
     expect(window.location.search).toBe('')
   })
 
+  it('邮箱接入是独立第三视图，并隐藏看板搜索、筛选和新增按钮', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/mail/accounts') {
+        return Promise.resolve(jsonBody({ items: [], pending_count: 0 }))
+      }
+      if (url === '/api/mail/candidates?state=pending') {
+        return Promise.resolve(jsonBody({ items: [], total: 0 }))
+      }
+      if (url.startsWith('/api/applications?')) {
+        return Promise.resolve(jsonBody(listPayload()))
+      }
+      throw new Error(`unexpected request: ${init?.method} ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '邮箱接入' }))
+    expect(window.location.search).toBe('?view=mail')
+    expect(await screen.findByRole('heading', { name: '邮箱接入', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('搜索公司或岗位')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('new-record-button')).not.toBeInTheDocument()
+  })
+
   it('搜索输入防抖 300ms 后写入 URL', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn().mockResolvedValue(jsonBody(listPayload()))

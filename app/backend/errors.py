@@ -7,6 +7,7 @@ from typing import Any
 # Error codes
 CODE_BAD_REQUEST = "bad_request"
 CODE_HOST_NOT_ALLOWED = "host_not_allowed"
+CODE_ORIGIN_NOT_ALLOWED = "origin_not_allowed"
 CODE_NOT_JSON = "not_json"
 CODE_NOT_FOUND = "application_not_found"
 CODE_VALIDATION = "validation_error"
@@ -39,6 +40,14 @@ def host_not_allowed(host: str) -> ApiError:
         CODE_HOST_NOT_ALLOWED,
         "Host is not allowed; the API only accepts loopback hosts.",
         {"host": host},
+    )
+
+
+def origin_not_allowed() -> ApiError:
+    return ApiError(
+        403,
+        CODE_ORIGIN_NOT_ALLOWED,
+        "Browser write requests must use the same loopback origin.",
     )
 
 

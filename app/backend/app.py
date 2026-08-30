@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import Paths, default_paths
 from .database import DatabaseUnavailableError
-from .errors import ApiError, CODE_UNKNOWN, host_not_allowed, not_json
+from .errors import ApiError, CODE_UNKNOWN, host_not_allowed, not_json, origin_not_allowed
 from .migrations import SchemaVersionError, ensure_migrations
 
 ALLOWED_HOSTS = {"localhost", "127.0.0.1", "::1"}
@@ -37,7 +37,27 @@ class RequestGuard(BaseHTTPMiddleware):
         host = _hostname_from_header(request.headers.get("host") or "")
         if host and host not in ALLOWED_HOSTS:
             return JSONResponse(status_code=400, content=_error_body(host_not_allowed(host)))
-        if request.method in {"POST", "PATCH"}:
+        if request.method in {"POST", "PATCH", "PUT", "DELETE"}:
+            origin = request.headers.get("origin")
+            if origin:
+                try:
+                    parsed_origin = urlsplit(origin)
+                    origin_host = (parsed_origin.hostname or "").casefold()
+                    request_port = urlsplit(f"//{request.headers.get('host') or ''}").port
+                    origin_port = parsed_origin.port
+                    effective_request_port = request_port or 80
+                    effective_origin_port = origin_port or (443 if parsed_origin.scheme == "https" else 80)
+                    same_origin = (
+                        parsed_origin.scheme == "http"
+                        and origin_host == host
+                        and effective_origin_port == effective_request_port
+                    )
+                except ValueError:
+                    same_origin = False
+                if not same_origin:
+                    error = origin_not_allowed()
+                    return JSONResponse(status_code=error.status_code, content=_error_body(error))
+        if request.method in {"POST", "PATCH", "PUT"}:
             content_type = (request.headers.get("content-type") or "").lower()
             if not content_type.startswith("application/json"):
                 return JSONResponse(status_code=415, content=_error_body(not_json()))
@@ -52,8 +72,13 @@ def _error_body(error: ApiError) -> dict:
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastAPI):
-    yield
+async def _lifespan(app: FastAPI):
+    service = app.state.mail_service
+    await service.start()
+    try:
+        yield
+    finally:
+        await service.stop()
 
 
 def create_app(db_path: Path | None = None) -> FastAPI:
@@ -73,13 +98,17 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 
     app = FastAPI(title="Career Application Board", lifespan=_lifespan)
     app.state.paths = paths
+    from .mail.service import MailService
+
+    app.state.mail_service = MailService(paths, scheduler_enabled=db_path is None)
     app.add_middleware(RequestGuard)
 
-    from .routers import agent, applications, health
+    from .routers import agent, applications, health, mail
 
     app.include_router(health.router)
     app.include_router(applications.router)
     app.include_router(agent.router)
+    app.include_router(mail.router)
 
     @app.exception_handler(ApiError)
     async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
@@ -152,5 +181,9 @@ def init_database(paths: Paths) -> None:
         version = get_schema_version(connection)
     finally:
         connection.close()
-    if version != 1:
-        raise SchemaVersionError("Schema migration did not reach version 1.")
+    from .migrations import SUPPORTED_SCHEMA_VERSION
+
+    if version != SUPPORTED_SCHEMA_VERSION:
+        raise SchemaVersionError(
+            f"Schema migration did not reach version {SUPPORTED_SCHEMA_VERSION}."
+        )

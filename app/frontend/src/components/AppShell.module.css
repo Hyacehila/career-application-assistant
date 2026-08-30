@@ -39,6 +39,7 @@
 
 .viewSwitcher {
   display: inline-flex;
+  flex: 0 0 auto;
   padding: 2px;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-control);
@@ -138,6 +139,10 @@
     flex: 1 1 100%;
     gap: 10px;
     overflow: hidden;
+  }
+
+  .viewSwitcher {
+    overflow-x: auto;
   }
 
   .viewButton {

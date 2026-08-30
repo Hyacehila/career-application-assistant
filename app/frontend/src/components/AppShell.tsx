@@ -33,6 +33,7 @@ export interface AppShellProps {
 const VIEW_ITEMS: Array<{ key: ViewName; label: string }> = [
   { key: "board", label: "看板" },
   { key: "table", label: "表格" },
+  { key: "mail", label: "邮箱接入" },
 ];
 
 export default function AppShell({
@@ -57,6 +58,7 @@ export default function AppShell({
 }: AppShellProps) {
   const isMobile = useIsMobile();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const isMailView = view === "mail";
   const filterProps = {
     stageGroup,
     type,
@@ -89,7 +91,7 @@ export default function AppShell({
                 </button>
               ))}
             </nav>
-            <form className={styles.searchForm} onSubmit={(event) => { event.preventDefault(); onSearchSubmit(); }}>
+            {!isMailView ? <form className={styles.searchForm} onSubmit={(event) => { event.preventDefault(); onSearchSubmit(); }}>
               <label className={styles.searchLabel} htmlFor="board-search">
                 搜索
               </label>
@@ -101,14 +103,14 @@ export default function AppShell({
                 value={search}
                 onChange={(event) => onSearchChange(event.target.value)}
               />
-            </form>
+            </form> : null}
           </div>
-          <button type="button" className={styles.primaryButton} data-testid="new-record-button" onClick={onNewRecord}>
+          {!isMailView ? <button type="button" className={styles.primaryButton} data-testid="new-record-button" onClick={onNewRecord}>
             <Plus size={16} aria-hidden="true" />
             <span>新增记录</span>
-          </button>
+          </button> : null}
         </div>
-        {isMobile ? (
+        {!isMailView && (isMobile ? (
           <div className={styles.mobileFilterBar}>
             <button
               type="button"
@@ -136,7 +138,7 @@ export default function AppShell({
           <div className={styles.filterRow}>
             <Filters {...filterProps} />
           </div>
-        )}
+        ))}
       </header>
       <main className={styles.content} data-testid="shell-content">
         {children}

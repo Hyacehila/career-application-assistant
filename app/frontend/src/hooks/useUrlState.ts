@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export type ViewName = 'board' | 'table'
+export type ViewName = 'board' | 'table' | 'mail'
 
 export interface UrlStateValue {
   view: ViewName
@@ -45,7 +45,7 @@ function parseUrlState(search: string): UrlStateValue {
     : DEFAULT_PAGE_SIZE
   const sort = params.get('sort') ?? DEFAULT_SORT
   return {
-    view: viewParam === 'table' ? 'table' : DEFAULT_VIEW,
+    view: viewParam === 'table' || viewParam === 'mail' ? viewParam : DEFAULT_VIEW,
     q: params.get('q') ?? '',
     stageGroup: params.get('stage_group') ?? '',
     status: params.get('status') ?? '',

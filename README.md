@@ -14,6 +14,7 @@ A local, single-user job application workspace that combines guarded browser for
 | Form assistance | Codex reads only `private/resume_materials.md`, fills the recruitment page already open in Chrome, uploads explicitly declared attachments, and stops before final submission. |
 | Agent tracking | After a form is prepared, the agent checks or starts the local API and creates an idempotent `pending_review` record. |
 | Status updates | A user-confirmed submission, assessment notice, interview invitation, offer, rejection, or withdrawal is appended as a validated timeline event. |
+| Mail ingestion | Outlook is polled through Microsoft Graph delta queries; QQ Mail and 163 Mail are polled through read-only IMAPS UID scans. Only structured recruitment events reach the board. |
 | Local board | React board and table views provide search, filters, sorting, pagination, drag-based stage updates, detail drawers, next actions, and soft deletion. |
 | Local data | FastAPI writes one SQLite database at `private/applications.sqlite`; no arbitrary production database path is accepted. |
 | Guardrails | The API is loopback-only, rejects non-JSON writes and unexpected hosts, validates dates and stage transitions, and never lets a form-fill callback mark an application as submitted. |
@@ -31,7 +32,8 @@ The interface has ten precise statuses grouped into five board columns:
 ## What it deliberately does not do
 
 - It never clicks “Submit application”, “Confirm”, “Send”, or an equivalent final action.
-- It does not read a mailbox automatically or connect to an email account. The user supplies the relevant message when requesting an update.
+- It is not an email client: there is no inbox UI, message search, attachment download, SMTP, reply, forwarding, deletion, or read/unread mutation.
+- It does not expose a webhook. Microsoft Graph is polled because the supported service is local-only and has no public HTTPS callback.
 - It does not automate login, CAPTCHA, identity verification, account creation, payment, background-check consent, or external authorization.
 - It does not scrape jobs, recommend roles, send notifications, sync calendars, or run unattended bulk applications.
 - It does not provide accounts, cloud sync, remote access, or a multi-user deployment.
@@ -46,7 +48,10 @@ private/resume_materials.md ──> Codex ──> open recruitment page
                                   └──────> local JSON API ──> private/applications.sqlite
                                                     ▲
                                                     │
-                                            React board/table
+                            Graph / read-only IMAPS │
+                                    mail providers ─┤
+                                                    │
+                                      React board/table/mail setup
 ```
 
 `AGENTS.md` defines the agent’s browser, privacy, attachment, conflict, and database-writing rules. The browser UI and the agent share the same HTTP API; the agent must not execute SQL directly.
@@ -124,6 +129,26 @@ The default view is a five-column board. The same records can be viewed as a nin
 
 On screens narrower than 768 px, the board becomes a single-stage list and details open in a bottom drawer. The service still remains local-only; the responsive layout does not enable LAN access.
 
+## Read-only mailbox ingestion
+
+Open the **Mail ingestion** view to connect any combination of the three supported providers:
+
+| Provider | Connection | Incremental cursor | Secret storage |
+| --- | --- | --- | --- |
+| Outlook / Outlook.com | Microsoft Graph delegated `Mail.Read`, authorization-code login with PKCE | Inbox delta link | MSAL cache encrypted by Windows DPAPI under `%LOCALAPPDATA%` |
+| QQ Mail | TLS IMAP on port 993 with a separately generated authorization code | `UIDVALIDITY` plus last processed UID | Windows Credential Manager |
+| 163 Mail | TLS IMAP on port 993 with a client authorization password | `UIDVALIDITY` plus last processed UID | Windows Credential Manager |
+
+For Outlook, register a Microsoft Entra **public client** application, allow personal Microsoft accounts if needed, configure `http://localhost` as a mobile/desktop redirect URI, and add delegated `Mail.Read`. Enter only its public Client ID in the UI; no client secret is used. MSAL performs the interactive authorization-code flow with PKCE, requests offline access as part of its default client flow, and refreshes tokens from the encrypted cache. The implementation follows the official [message delta API](https://learn.microsoft.com/graph/api/message-delta?view=graph-rest-1.0) and uses the open-source [MSAL Python](https://github.com/AzureAD/microsoft-authentication-library-for-python) client.
+
+For QQ or 163, enable IMAP in the provider settings and generate a dedicated client authorization code/password. Never enter the normal web-login password. See the [QQ Mail connector instructions](https://hiflow.tencent.com/docs/applications/qq-mail/) and [NetEase Mail help](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae).
+
+The first connection defaults to “new messages only”; optional 30- or 90-day backfill is available. A single scheduler polls connected accounts about every five minutes. Header fields are read first, and a bounded non-attachment text body is fetched only when the subject/sender gate suggests a recruitment event. IMAP sessions select Inbox read-only and use UID fetches plus `BODY.PEEK`; the service has no mailbox mutation API.
+
+Exact interview rounds and assessments may be written automatically only when one active application matches by the existing priority rules, required dates are explicit, the transition is safe, and confidence is at least 90. Generic interviews, ambiguous or conflicting dates, missing/multiple matches, `applied`, terminal stages, archived records, and unsafe transitions remain in the review queue. “Applied” still requires the user to confirm that they personally submitted the application.
+
+Only company, role, proposed stage, dates, confidence, match ID, provider/fingerprint, and queue metadata are persisted while review is pending. Subject, sender, full body, attachments, meeting links, verification codes, and private contacts are never stored. Pending candidates expire and are structurally redacted after 90 days; confirmed, ignored, duplicate, and expired candidates are redacted immediately. Disconnecting deletes the provider cursor and secure credential/token cache.
+
 ## Using Codex as the database entry point
 
 Start a Codex task in the repository root so that it loads `AGENTS.md`. For browser filling, connect the Codex Chrome extension, open the recruitment application page yourself, and use a direct request such as:
@@ -182,6 +207,16 @@ All API responses are JSON under `/api`. POST and PATCH requests must use `Conte
 | `PATCH` | `/api/applications/{id}/events/{event_id}` | Correct event scheduling details while retaining the event ID |
 | `POST` | `/api/agent/fill-completed` | Idempotently record a completed form as pending review |
 | `POST` | `/api/agent/status-update` | Uniquely match an active application and append a structured event |
+| `GET` | `/api/mail/accounts` | Three provider connection states and pending counts |
+| `POST` | `/api/mail/accounts/{provider}/connect` | Start Outlook authorization or validate/store an IMAP authorization code |
+| `POST` | `/api/mail/accounts/{provider}/sync` | Start one incremental read |
+| `POST` | `/api/mail/accounts/{provider}/pause` | Pause polling without deleting credentials |
+| `POST` | `/api/mail/accounts/{provider}/resume` | Resume polling and request an immediate sync |
+| `DELETE` | `/api/mail/accounts/{provider}` | Delete the cursor and secure credential/token cache |
+| `GET` | `/api/mail/operations/{id}` | Poll a connect/sync operation using sanitized status codes |
+| `GET` | `/api/mail/candidates` | List structured review candidates; raw mail fields are absent |
+| `POST` | `/api/mail/candidates/{id}/confirm` | Validate and append a reviewed timeline event |
+| `POST` | `/api/mail/candidates/{id}/dismiss` | Ignore and redact a pending candidate |
 
 Agent status matching uses, in order: exact active record ID; normalized public job URL; company plus job code; or company plus role plus location. An archived or unknown ID returns `404`. Other match conflicts return `409`, while missing or invalid information returns `422`. The agent must not change request meaning to work around these responses.
 
@@ -200,7 +235,7 @@ Agent status matching uses, in order: exact active record ID; normalized public 
 - resume, photo, document, and image attachments;
 - `.resume.sha256`, local environments, caches, editor state, and build output.
 
-SQLite contains job metadata, the current status, structured event dates, a short note, and next-action fields. It is not a candidate profile store. The API strips query parameters and fragments from public job URLs and rejects undeclared request fields.
+SQLite contains job metadata, the current status, structured event dates, a short note, next-action fields, mailbox cursors, and the bounded structured review queue. It contains neither mailbox addresses nor credentials, tokens, or raw messages. QQ/163 authorization codes use Windows Credential Manager targets keyed by an opaque account ID. Outlook uses `msal-extensions` with Windows DPAPI and fails closed rather than creating a plaintext cache. The API strips query parameters and fragments from public job URLs and rejects undeclared request fields.
 
 For backup, stop the service before copying `private/applications.sqlite` to another protected local location. Do not put backups in Git. Git ignore rules do not prevent operating-system backup software or cloud-folder synchronization from copying `private/`; configure those systems separately.
 
@@ -236,6 +271,8 @@ pnpm --dir app\frontend test
 pnpm --dir app\frontend build
 ```
 
+Provider-free tests use deterministic Graph/IMAP doubles. A separate no-auth smoke check may open TLS connections to `imap.qq.com:993` and `imap.163.com:993`; it must never send credentials and is not required for the unit suite.
+
 Install the lockfile-compatible Chromium once, then run the persistent browser closed-loop regression:
 
 ```powershell
@@ -265,9 +302,12 @@ Backend-specific layout and startup notes are available in [app/README.md](app/R
 | Health returns `503` | Check that `private/` is writable and that the database schema is supported; do not delete or replace the database automatically. |
 | Agent receives `409` | More than one record matched, a stage conflicts, or an ended record received a new process event; resolve it with the user. |
 | Agent receives `422` | Required job identity, interview date, assessment schedule/deadline, or another validated field is missing or invalid. |
+| Outlook says reauthorization is required | Confirm the app is a public client, the redirect URI is `http://localhost`, delegated `Mail.Read` is enabled, and reconnect from the Mail ingestion view. |
+| QQ/163 authentication fails | Enable IMAP, generate a dedicated authorization code/client password, and do not use the web-login password. |
+| Credential store is unavailable | Run on Windows under an interactive user account with Credential Manager and DPAPI available; the service intentionally has no plaintext fallback. |
 | Private workspace validation fails | Resolve placeholders, declared attachments, ordering, or resume-hash mismatch without printing the underlying values. |
 | Public release check fails | Stop publication, inspect the named check, and correct the staged content instead of bypassing it. |
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE). Mail ingestion builds on maintained open-source libraries rather than embedding a third-party inbox; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

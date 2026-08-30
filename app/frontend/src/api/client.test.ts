@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { APIError, listAllApplications, listApplications } from './client'
+import {
+  APIError,
+  dismissMailCandidate,
+  listAllApplications,
+  listApplications,
+  pauseMailAccount,
+  resumeMailAccount,
+  syncMailAccount,
+} from './client'
 import { jsonBody } from '../test/http'
 
 afterEach(() => {
@@ -59,5 +67,36 @@ describe('api client', () => {
     expect(payload.items).toHaveLength(205)
     expect(payload.items.at(-1)).toMatchObject({ id: 205 })
     expect(payload.counts).toMatchObject({ pending_review: 203, interview: 1, ended: 1 })
+  })
+
+  it('无参数邮箱写操作仍发送 JSON 空对象', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/dismiss')) return Promise.resolve(new Response(null, { status: 204 }))
+      if (url.endsWith('/sync')) return Promise.resolve(jsonBody({ operation_id: 'op-1', status: 'pending' }, 202))
+      return Promise.resolve(jsonBody({
+        provider: 'qq',
+        status: url.endsWith('/pause') ? 'paused' : 'connected',
+        masked_address: null,
+        history_window: 'new_only',
+        last_attempt_at: null,
+        last_success_at: null,
+        next_retry_at: null,
+        error_code: null,
+        pending_count: 0,
+      }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await syncMailAccount('qq')
+    await pauseMailAccount('qq')
+    await resumeMailAccount('qq')
+    await dismissMailCandidate(7)
+
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toMatchObject({ method: 'POST', body: '{}' })
+      expect(new Headers((init as RequestInit).headers).get('Content-Type')).toBe('application/json')
+    }
   })
 })

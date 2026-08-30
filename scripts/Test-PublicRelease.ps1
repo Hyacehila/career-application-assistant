@@ -82,6 +82,7 @@ $requiredFiles = @(
     'LICENSE',
     'README.md',
     'README.zh-CN.md',
+    'THIRD_PARTY_NOTICES.md',
     'pyproject.toml',
     'resume_materials.example.md',
     'uv.lock',
@@ -110,7 +111,7 @@ $trackedFiles = @(& git ls-files) | Where-Object { -not [string]::IsNullOrWhiteS
 $missingRequiredFiles = @($requiredFiles | Where-Object { $_ -notin $trackedFiles })
 Write-CheckResult -Name 'required-public-files-present' -Passed ($missingRequiredFiles.Count -eq 0)
 
-$allowedPathPattern = '^(?:\.gitignore|AGENTS\.md|LICENSE|README\.md|README\.zh-CN\.md|pyproject\.toml|resume_materials\.example\.md|uv\.lock|app/.*|scripts/.*)$'
+$allowedPathPattern = '^(?:\.gitignore|AGENTS\.md|LICENSE|README\.md|README\.zh-CN\.md|THIRD_PARTY_NOTICES\.md|pyproject\.toml|resume_materials\.example\.md|uv\.lock|app/.*|scripts/.*)$'
 $unexpectedTrackedFiles = @($trackedFiles | Where-Object { $_ -notmatch $allowedPathPattern })
 Write-CheckResult -Name 'tracked-file-allowlist' -Passed ($unexpectedTrackedFiles.Count -eq 0)
 

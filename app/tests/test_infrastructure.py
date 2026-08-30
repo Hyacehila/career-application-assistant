@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 from backend.app import init_database
 from backend.config import Paths
 from backend.database import DatabaseUnavailableError, open_connection
-from backend.migrations import SchemaVersionError, ensure_migrations
+from backend.migrations import MIGRATIONS, SchemaVersionError, ensure_migrations
 
 
 def test_first_run_creates_database_only_at_fixed_path(private_root: Path, db_path: Path) -> None:
@@ -46,12 +47,117 @@ def test_migrations_are_idempotent(private_root: Path) -> None:
     init_database(paths)
 
 
+def test_v3_migration_backfills_opaque_credential_generation(private_root: Path) -> None:
+    paths = Paths(repository_root=private_root.parent, private_root=private_root)
+    connection = open_connection(paths)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.executescript(MIGRATIONS[1])
+        connection.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (1, 'fixture')"
+        )
+        connection.executescript(MIGRATIONS[2])
+        connection.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (2, 'fixture')"
+        )
+        connection.execute(
+            """
+            INSERT INTO mail_accounts (
+                id, provider, status, public_client_id, history_window,
+                last_attempt_at, last_success_at, next_retry_at, last_error_code,
+                created_at, updated_at, disconnected_at
+            ) VALUES (
+                'legacy-account', 'qq', 'connected', NULL, 'new_only',
+                NULL, NULL, NULL, NULL, 'fixture', 'fixture', NULL
+            )
+            """
+        )
+        connection.commit()
+
+        assert ensure_migrations(connection) == 3
+        assert ensure_migrations(connection) == 3
+        row = connection.execute(
+            "SELECT * FROM mail_accounts WHERE id = 'legacy-account'"
+        ).fetchone()
+        columns = {
+            item["name"] for item in connection.execute("PRAGMA table_info(mail_accounts)")
+        }
+    finally:
+        connection.close()
+
+    assert {
+        "connection_generation",
+        "credential_ref",
+        "pending_credential_ref",
+        "previous_credential_ref",
+    } <= columns
+    assert row["connection_generation"] == "legacy-account"
+    assert row["credential_ref"] == "legacy-account"
+    assert row["pending_credential_ref"] is None
+    assert row["previous_credential_ref"] is None
+
+
+def test_failed_migration_rolls_back_and_can_be_retried(
+    private_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = Paths(repository_root=private_root.parent, private_root=private_root)
+    connection = open_connection(paths)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.executescript(MIGRATIONS[1])
+        connection.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (1, 'fixture')"
+        )
+        connection.executescript(MIGRATIONS[2])
+        connection.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (2, 'fixture')"
+        )
+        connection.commit()
+
+        original = MIGRATIONS[3]
+        broken = original.replace(
+            "ALTER TABLE mail_accounts ADD COLUMN credential_ref TEXT;",
+            "THIS IS NOT VALID SQL;",
+        )
+        monkeypatch.setitem(MIGRATIONS, 3, broken)
+        with pytest.raises(sqlite3.OperationalError):
+            ensure_migrations(connection)
+
+        columns = {
+            item["name"] for item in connection.execute("PRAGMA table_info(mail_accounts)")
+        }
+        version = connection.execute(
+            "SELECT max(version) AS version FROM schema_migrations"
+        ).fetchone()["version"]
+        assert "connection_generation" not in columns
+        assert version == 2
+
+        monkeypatch.setitem(MIGRATIONS, 3, original)
+        assert ensure_migrations(connection) == 3
+    finally:
+        connection.close()
+
+
 def test_unknown_schema_version_stops_startup(private_root: Path) -> None:
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     init_database(paths)
 
     connection = open_connection(paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (2, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (4, 'x')")
     connection.commit()
     connection.close()
 
@@ -65,7 +171,7 @@ def test_health_reports_ok_schema_version(client) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["database"] == "available"
-    assert body["schema_version"] == 1
+    assert body["schema_version"] == 3
 
 
 def test_health_returns_503_when_database_is_unavailable(client, private_root: Path) -> None:
@@ -85,7 +191,7 @@ def test_health_returns_503_when_database_is_unavailable(client, private_root: P
 
 def test_health_returns_503_for_incompatible_schema(client) -> None:
     connection = open_connection(client.app.state.paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (2, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (4, 'x')")
     connection.commit()
     connection.close()
     response = client.get("/api/health")
@@ -145,3 +251,30 @@ def test_non_json_patch_is_rejected(client) -> None:
         headers={"content-type": "text/plain"},
     )
     assert response.status_code == 415
+
+
+def test_cross_origin_write_is_rejected(client) -> None:
+    response = client.post(
+        "/api/applications",
+        json={
+            "company_name": "示例科技",
+            "job_title": "前端工程师",
+            "event_date": "2026-08-01",
+        },
+        headers={"origin": "https://malicious.example"},
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "origin_not_allowed"
+
+
+def test_same_loopback_origin_write_is_allowed(client) -> None:
+    response = client.post(
+        "/api/applications",
+        json={
+            "company_name": "示例科技",
+            "job_title": "前端工程师",
+            "event_date": "2026-08-01",
+        },
+        headers={"origin": "http://127.0.0.1:8000"},
+    )
+    assert response.status_code == 201

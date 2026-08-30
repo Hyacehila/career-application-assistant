@@ -11,7 +11,7 @@ always created at `private/applications.sqlite`.
   or migrates the fixed database, serves the API on `127.0.0.1:8000`, and serves
   the built frontend from `app/frontend/dist` when present.
 - `backend/` — the FastAPI application factory, SQLite data layer, migrations,
-  and the application/agent routers.
+  application/agent/mail routers, and read-only Graph/IMAP ingestion modules.
 - `frontend/` — the Vite + React + TypeScript board UI (built to `frontend/dist`).
 - `tests/` — backend pytest suite plus a public simulated recruitment fixture;
   all databases are injected under the system temp directory.
@@ -66,13 +66,30 @@ pnpm --dir app\frontend exec playwright install chromium
 pwsh -NoProfile -File .\scripts\Test-AgentBrowserE2E.ps1
 ```
 
-The service binds loopback only. Write requests must be JSON and come from a
-loopback `Host`.
+The service binds loopback only. Write requests must be JSON, use a loopback
+`Host`, and, when an `Origin` header is present, come from that same loopback
+origin.
+
+## Mail ingestion runtime
+
+The third frontend view configures Outlook, QQ Mail, and 163 Mail without
+presenting an inbox. Outlook uses MSAL Python plus Microsoft Graph delegated
+`Mail.Read` and Inbox delta links. QQ/163 use IMAPClient over verified TLS on
+port 993, select Inbox read-only, and persist `UIDVALIDITY` plus the last UID.
+The production lifespan starts one APScheduler polling job; injected test
+databases disable it.
+
+This feature is Windows-only. IMAP authorization codes are stored in Windows
+Credential Manager. The MSAL token cache is encrypted through Windows DPAPI by
+`msal-extensions`; both mechanisms fail closed. Structured pending review
+candidates expire after 90 days. Message subjects, senders, bodies, attachments,
+meeting links, and verification codes are not database columns.
 
 ## Data and privacy
 
-The only data file is `private/applications.sqlite`. It stores job metadata,
-stage events, and the structured timeline — never candidate names, phone
-numbers, addresses, form answers, attachment content, or raw email bodies.
+The only database file is `private/applications.sqlite`. It stores job metadata,
+stage events, the structured timeline, mail cursors, and the bounded structured
+review queue — never candidate names, phone numbers, addresses, mailbox
+credentials/tokens, form answers, attachment content, or raw email bodies.
 `AGENTS.md` is the authority for how the agent records applications and updates
 status; automation always stops before final submission.

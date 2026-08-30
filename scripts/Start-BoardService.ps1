@@ -49,7 +49,7 @@ function Test-ServiceHealthy {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            $health.schema_version -eq 1
+            $health.schema_version -eq 3
         )
     } catch {
         return $false

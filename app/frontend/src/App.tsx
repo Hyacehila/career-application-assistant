@@ -3,6 +3,7 @@ import AppShell from './components/AppShell'
 import BoardView from './components/BoardView'
 import ConfirmDialog from './components/ConfirmDialog'
 import DetailDrawer from './components/DetailDrawer'
+import MailIngestionView from './components/MailIngestionView'
 import RecordFormDialog from './components/RecordFormDialog'
 import StatusFormDialog, { type StatusFormTarget } from './components/StatusFormDialog'
 import TableView from './components/TableView'
@@ -24,7 +25,7 @@ export default function App() {
   const [urlState, updateUrlState] = useUrlState()
   const [searchDraft, setSearchDraft] = useState(urlState.q)
   const searchTimer = useRef<number | null>(null)
-  const boardQuery = useBoardQuery(urlState)
+  const boardQuery = useBoardQuery(urlState, urlState.view !== 'mail')
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [recordFormOpen, setRecordFormOpen] = useState(false)
@@ -66,6 +67,7 @@ export default function App() {
   }
 
   const handleViewChange = (view: ViewName) => {
+    if (view === 'mail') setSelectedId(null)
     updateUrlState({ view }, { push: true })
   }
 
@@ -111,8 +113,15 @@ export default function App() {
     showToast(message, 'error')
   }
 
-  const content =
-    urlState.view === 'board' ? (
+  const content = urlState.view === 'mail' ? (
+    <MailIngestionView
+      onNotify={showToast}
+      onEventCommitted={() => {
+        boardQuery.refetch()
+        setDetailVersion((value) => value + 1)
+      }}
+    />
+  ) : urlState.view === 'board' ? (
       <BoardView
         items={boardQuery.data.items}
         loading={boardQuery.loading}
@@ -127,7 +136,7 @@ export default function App() {
         onStatusChange={handleStatusChange}
         onEmptyNewRecord={openCreateDialog}
       />
-    ) : (
+  ) : (
       <TableView
         items={boardQuery.data.items}
         total={boardQuery.data.total}
@@ -143,7 +152,7 @@ export default function App() {
         onRetry={boardQuery.refetch}
         onEmptyNewRecord={openCreateDialog}
       />
-    )
+  )
 
   return (
     <>

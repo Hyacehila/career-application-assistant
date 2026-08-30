@@ -68,7 +68,7 @@ function Test-BoardHealth {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            [int] $health.schema_version -eq 1
+            [int] $health.schema_version -eq 3
         )
     } catch {
         return $false

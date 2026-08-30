@@ -1,0 +1,643 @@
+.page {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero {
+  min-height: 118px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 28px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(15, 155, 150, 0.15), transparent 32%),
+    linear-gradient(135deg, #FFFFFF 0%, #F4FAFB 100%);
+}
+
+.kicker,
+.sectionEyebrow,
+.providerEyebrow {
+  color: var(--color-flow-accent);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.intro {
+  max-width: 680px;
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+}
+
+.pendingSummary {
+  flex: 0 0 auto;
+  min-width: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--color-text-secondary);
+}
+
+.pendingSummary strong {
+  color: var(--color-text-primary);
+  font-size: 32px;
+  line-height: 36px;
+}
+
+.pendingSummary span {
+  font-size: var(--aux-font-size);
+}
+
+.providerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.providerCard,
+.candidateCard,
+.reviewSection {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.providerCard {
+  min-width: 0;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(17, 27, 52, 0.03);
+}
+
+.providerHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.providerMark {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.providerMark_outlook {
+  background: #1768E8;
+}
+
+.providerMark_qq {
+  background: #111B34;
+}
+
+.providerMark_163 {
+  background: #D83A3A;
+}
+
+.providerTitleBlock {
+  min-width: 0;
+  flex: 1;
+}
+
+.maskedAddress {
+  min-height: 18px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  max-width: 124px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-workspace-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status_connected {
+  background: rgba(20, 166, 122, 0.1);
+  color: #0D7859;
+}
+
+.status_connecting {
+  background: rgba(23, 104, 232, 0.1);
+  color: var(--color-brand);
+}
+
+.status_paused {
+  background: rgba(138, 148, 166, 0.13);
+  color: #5D697C;
+}
+
+.status_needs_reauth,
+.status_error {
+  background: rgba(239, 75, 82, 0.09);
+  color: #B72E35;
+}
+
+.accountFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-workspace-bg);
+}
+
+.accountFacts div {
+  min-width: 0;
+}
+
+.accountFacts dt {
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+}
+
+.accountFacts dd {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: var(--body-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountError {
+  margin-top: 10px;
+  color: var(--color-rejected);
+  font-size: var(--aux-font-size);
+}
+
+.connectForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--color-text-primary);
+  font-size: var(--control-label-font-size);
+  line-height: var(--control-label-line-height);
+  font-weight: var(--control-label-font-weight-strong);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.field input:hover,
+.field select:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.field input:disabled,
+.field select:disabled {
+  background: var(--color-workspace-bg);
+  color: var(--color-text-secondary);
+}
+
+.securityHint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+  line-height: var(--aux-line-height);
+}
+
+.securityHint svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--color-flow-accent);
+}
+
+.formActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.formActions > a {
+  font-size: var(--aux-font-size);
+}
+
+.formButtons,
+.accountActions,
+.candidateActions > div,
+.errorBanner > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.formButtons {
+  align-self: stretch;
+  justify-content: flex-end;
+}
+
+.accountActions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.accountActions button {
+  flex: 1 1 auto;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: var(--border-width) solid rgba(239, 75, 82, 0.35);
+  border-radius: var(--radius-card);
+  background: rgba(239, 75, 82, 0.06);
+}
+
+.errorBanner > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.errorBanner strong {
+  font-size: var(--body-font-size);
+}
+
+.errorBanner span {
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+}
+
+.loadingLine {
+  padding: 9px 12px;
+  border-radius: var(--radius-control);
+  background: rgba(23, 104, 232, 0.06);
+  color: var(--color-brand);
+  font-weight: var(--body-font-weight-medium);
+}
+
+.providerUnavailable {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 28px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.providerUnavailable svg {
+  margin-bottom: 3px;
+  color: var(--color-flow-accent);
+}
+
+.providerUnavailable strong {
+  color: var(--color-text-primary);
+}
+
+.providerUnavailable span {
+  font-size: var(--aux-font-size);
+}
+
+.reviewSection {
+  overflow: hidden;
+}
+
+.reviewHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.candidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.candidateCard {
+  padding: 18px;
+  background: #FCFDFE;
+  content-visibility: auto;
+  contain-intrinsic-size: 370px;
+}
+
+.candidateSummary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.candidateSummary h3 {
+  margin-top: 2px;
+  font-size: var(--company-font-size);
+  line-height: var(--company-line-height);
+}
+
+.candidateMeta {
+  margin-top: 3px;
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+}
+
+.confidenceBlock {
+  flex: 0 0 116px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+}
+
+.confidenceBlock strong {
+  color: var(--color-text-primary);
+}
+
+.confidenceTrack {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.confidenceTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-flow-accent);
+}
+
+.reasonList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reasonList li {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(245, 164, 0, 0.11);
+  color: #805800;
+  font-size: var(--aux-font-size);
+}
+
+.candidateForm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.fieldWide {
+  grid-column: span 2;
+}
+
+.personalConfirmation,
+.validationHint,
+.candidateActions {
+  grid-column: 1 / -1;
+}
+
+.validationHint {
+  color: var(--color-rejected);
+  font-size: var(--aux-font-size);
+}
+
+.candidateActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.candidateActions > p {
+  color: var(--color-text-secondary);
+  font-size: var(--aux-font-size);
+}
+
+.emptyReview {
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 32px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.emptyReview svg {
+  margin-bottom: 3px;
+  color: var(--color-flow-accent);
+}
+
+.emptyReview strong {
+  color: var(--color-text-primary);
+}
+
+.emptyReview span {
+  max-width: 520px;
+  font-size: var(--aux-font-size);
+}
+
+@media (max-width: 1023px) {
+  .providerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .providerCard {
+    display: grid;
+    grid-template-columns: minmax(240px, 0.8fr) minmax(340px, 1.2fr);
+    column-gap: 20px;
+  }
+
+  .accountFacts {
+    grid-column: 1;
+  }
+
+  .accountError {
+    grid-column: 1;
+  }
+
+  .connectForm,
+  .accountActions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    margin-top: 0;
+    padding-top: 0;
+    padding-left: 20px;
+    border-top: 0;
+    border-left: var(--border-width) solid var(--color-border);
+  }
+
+  .candidateForm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .page {
+    gap: 16px;
+  }
+
+  .hero {
+    min-height: 0;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .pendingSummary {
+    min-width: auto;
+  }
+
+  .providerCard {
+    display: block;
+    padding: 16px;
+  }
+
+  .connectForm,
+  .accountActions {
+    margin-top: 16px;
+    padding-top: 16px;
+    padding-left: 0;
+    border-top: var(--border-width) solid var(--color-border);
+    border-left: 0;
+  }
+
+  .field input,
+  .field select,
+  .accountActions button,
+  .formButtons button,
+  .candidateActions button,
+  .reviewHeading button,
+  .errorBanner button {
+    min-height: 44px;
+  }
+
+  .candidateSummary,
+  .candidateActions,
+  .errorBanner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .candidateForm {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldWide {
+    grid-column: auto;
+  }
+
+  .personalConfirmation,
+  .validationHint,
+  .candidateActions {
+    grid-column: 1;
+  }
+
+  .confidenceBlock {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .candidateActions > div,
+  .errorBanner > div:last-child {
+    width: 100%;
+  }
+
+  .candidateActions button,
+  .errorBanner button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 420px) {
+  .hero {
+    flex-direction: column;
+  }
+
+  .pendingSummary {
+    align-items: flex-start;
+  }
+
+  .providerHeading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .statusBadge {
+    margin-left: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confidenceTrack span {
+    transition: none;
+  }
+}

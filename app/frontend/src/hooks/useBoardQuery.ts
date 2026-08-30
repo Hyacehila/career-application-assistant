@@ -52,7 +52,7 @@ function toQueryError(error: unknown): BoardQueryError {
   return { code: 'request_failed', message: '加载投递记录失败，请检查后端服务是否已启动。' }
 }
 
-export function useBoardQuery(query: UrlStateValue): BoardQueryResult {
+export function useBoardQuery(query: UrlStateValue, enabled = true): BoardQueryResult {
   const [result, setResult] = useState<{
     data: ListApplicationsResponse
     error: BoardQueryError | null
@@ -65,6 +65,10 @@ export function useBoardQuery(query: UrlStateValue): BoardQueryResult {
   }, [])
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
     const controller = new AbortController()
     setLoading(true)
     const filters = {
@@ -93,7 +97,7 @@ export function useBoardQuery(query: UrlStateValue): BoardQueryResult {
     return () => {
       controller.abort()
     }
-  }, [query, tick])
+  }, [enabled, query, tick])
 
   return {
     data: result.data,

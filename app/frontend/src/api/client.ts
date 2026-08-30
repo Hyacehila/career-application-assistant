@@ -96,6 +96,122 @@ export interface EventPayload {
   source: string
 }
 
+export interface EventWriteResponse {
+  application: ApplicationRecord
+  event: ApplicationEvent
+}
+
+export type MailProvider = 'outlook' | 'qq' | '163'
+export type HistoryWindow = 'new_only' | 'last_30_days' | 'last_90_days'
+export type MailAccountStatus =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'paused'
+  | 'needs_reauth'
+  | 'error'
+
+export interface MailAccount {
+  provider: MailProvider
+  status: MailAccountStatus
+  masked_address: string | null
+  history_window: HistoryWindow
+  last_attempt_at: string | null
+  last_success_at: string | null
+  next_retry_at: string | null
+  error_code: string | null
+  pending_count: number
+}
+
+export interface MailAccountsResponse {
+  items: MailAccount[]
+  pending_count: number
+}
+
+export type MailOperationKind = 'connect' | 'sync'
+export type MailOperationStatus = 'pending' | 'running' | 'succeeded' | 'failed'
+
+export interface MailOperationAccepted {
+  operation_id: string
+  status: 'pending'
+}
+
+export interface MailOperation {
+  id: string
+  provider: MailProvider
+  kind: MailOperationKind
+  status: MailOperationStatus
+  error_code?: string | null
+}
+
+export type MailCandidateState = 'pending' | 'committed' | 'dismissed' | 'expired' | 'duplicate'
+
+export type ProposedMailStage =
+  | 'applied'
+  | 'assessment'
+  | 'interview_unspecified'
+  | 'interview_1'
+  | 'interview_2'
+  | 'interview_3'
+  | 'interview_hr'
+  | 'offer'
+  | 'rejected'
+  | 'withdrawn'
+
+export interface MailCandidate {
+  id: number
+  provider: MailProvider
+  state: MailCandidateState
+  company_name: string | null
+  job_title: string | null
+  proposed_stage: ProposedMailStage | null
+  event_date: string | null
+  scheduled_date: string | null
+  scheduled_time: string | null
+  deadline_date: string | null
+  deadline_time: string | null
+  timezone: string
+  confidence: number
+  matched_application_id: number | null
+  review_reasons: string[]
+  expires_at: string | null
+}
+
+export interface MailCandidatesResponse {
+  items: MailCandidate[]
+  total: number
+}
+
+export interface ConnectOutlookPayload {
+  client_id: string
+  history_window: HistoryWindow
+}
+
+export interface ConnectImapPayload {
+  mailbox_address: string
+  authorization_code: string
+  history_window: HistoryWindow
+}
+
+export type ConnectMailPayload = ConnectOutlookPayload | ConnectImapPayload
+
+export interface ConfirmMailCandidatePayload {
+  application_id: number
+  stage: Exclude<ProposedMailStage, 'interview_unspecified'>
+  scheduled_date?: string | null
+  scheduled_time?: string | null
+  deadline_date?: string | null
+  deadline_time?: string | null
+  timezone: string
+  confirm_personally_submitted: boolean
+}
+
+export interface ConfirmMailCandidateResponse {
+  candidate: MailCandidate
+  application: ApplicationRecord
+  event: ApplicationEvent
+}
+
 export interface ListApplicationsQuery {
   q?: string
   stageGroup?: string
@@ -283,7 +399,7 @@ export function deleteApplication(id: number, signal?: AbortSignal): Promise<unk
   return request(`/applications/${idSegment(id)}`, { method: 'DELETE' }, signal)
 }
 
-export function postEvent(id: number, body: EventPayload, signal?: AbortSignal): Promise<ApplicationEvent> {
+export function postEvent(id: number, body: EventPayload, signal?: AbortSignal): Promise<EventWriteResponse> {
   return request(`/applications/${idSegment(id)}/events`, { method: 'POST', body: JSON.stringify(body) }, signal)
 }
 
@@ -298,4 +414,65 @@ export function patchEvent(
     { method: 'PATCH', body: JSON.stringify(body) },
     signal,
   )
+}
+
+function providerSegment(provider: MailProvider): string {
+  return encodeURIComponent(provider)
+}
+
+export function listMailAccounts(signal?: AbortSignal): Promise<MailAccountsResponse> {
+  return request('/mail/accounts', { method: 'GET' }, signal)
+}
+
+export function connectMailAccount(
+  provider: MailProvider,
+  body: ConnectMailPayload,
+  signal?: AbortSignal,
+): Promise<MailOperationAccepted> {
+  return request(
+    `/mail/accounts/${providerSegment(provider)}/connect`,
+    { method: 'POST', body: JSON.stringify(body) },
+    signal,
+  )
+}
+
+export function getMailOperation(id: string, signal?: AbortSignal): Promise<MailOperation> {
+  return request(`/mail/operations/${encodeURIComponent(id)}`, { method: 'GET' }, signal)
+}
+
+export function syncMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<MailOperationAccepted> {
+  return request(`/mail/accounts/${providerSegment(provider)}/sync`, { method: 'POST', body: '{}' }, signal)
+}
+
+export function pauseMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<MailAccount> {
+  return request(`/mail/accounts/${providerSegment(provider)}/pause`, { method: 'POST', body: '{}' }, signal)
+}
+
+export function resumeMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<MailAccount> {
+  return request(`/mail/accounts/${providerSegment(provider)}/resume`, { method: 'POST', body: '{}' }, signal)
+}
+
+export function disconnectMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<void> {
+  return request(`/mail/accounts/${providerSegment(provider)}`, { method: 'DELETE' }, signal)
+}
+
+export function listMailCandidates(state: MailCandidateState = 'pending', signal?: AbortSignal): Promise<MailCandidatesResponse> {
+  const search = buildQueryString({ state })
+  return request(`/mail/candidates${search}`, { method: 'GET' }, signal)
+}
+
+export function confirmMailCandidate(
+  id: number,
+  body: ConfirmMailCandidatePayload,
+  signal?: AbortSignal,
+): Promise<ConfirmMailCandidateResponse> {
+  return request(
+    `/mail/candidates/${idSegment(id)}/confirm`,
+    { method: 'POST', body: JSON.stringify(body) },
+    signal,
+  )
+}
+
+export function dismissMailCandidate(id: number, signal?: AbortSignal): Promise<void> {
+  return request(`/mail/candidates/${idSegment(id)}/dismiss`, { method: 'POST', body: '{}' }, signal)
 }
