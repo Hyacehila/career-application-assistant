@@ -15,6 +15,8 @@
 *.jpg
 *.jpeg
 *.png
+!docs/assets/screenshots/demo-board.png
+!docs/assets/screenshots/demo-assessment-detail.png
 *.gif
 *.webp
 *.svg

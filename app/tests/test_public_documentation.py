@@ -1,4 +1,4 @@
-"""Text-only public documentation and relative-link release contracts."""
+"""Public documentation, screenshot allowlist, and relative-link contracts."""
 
 from __future__ import annotations
 
@@ -35,6 +35,15 @@ PUBLIC_DOCUMENTS = [
 ] + [REPOSITORY_ROOT / "docs" / name for name in sorted(DOCS_FILES)]
 
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]\r\n]*\]\s*\(([^)\r\n]+)\)")
+PUBLIC_SCREENSHOT_PATHS = (
+    "docs/assets/screenshots/demo-board.png",
+    "docs/assets/screenshots/demo-assessment-detail.png",
+)
+PUBLIC_SCREENSHOTS = {
+    path: REPOSITORY_ROOT / Path(path) for path in PUBLIC_SCREENSHOT_PATHS
+}
+ROOT_READMES = (REPOSITORY_ROOT / "README.md", REPOSITORY_ROOT / "README.zh-CN.md")
 FORBIDDEN_MEDIA_PATTERNS = (
     re.compile(r"!\[[^\]]*\]\s*(?:\([^)]*\)|\[[^\]]*\])", re.IGNORECASE),
     re.compile(r"<\s*(?:img|picture|video|audio|source)\b", re.IGNORECASE),
@@ -70,11 +79,39 @@ def test_documentation_file_set_is_exact() -> None:
     assert actual == DOCS_FILES
 
 
-def test_public_documentation_is_text_only() -> None:
+def test_public_screenshot_file_set_and_readme_references_are_exact() -> None:
+    screenshot_root = REPOSITORY_ROOT / "docs" / "assets" / "screenshots"
+    actual = {
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in screenshot_root.rglob("*")
+        if path.is_file()
+    }
+    assert actual == set(PUBLIC_SCREENSHOT_PATHS)
+
+    for document in ROOT_READMES:
+        text = document.read_text(encoding="utf-8")
+        targets = [match.group(1).strip() for match in MARKDOWN_IMAGE_RE.finditer(text)]
+        assert len(targets) == len(PUBLIC_SCREENSHOT_PATHS)
+        assert set(targets) == set(PUBLIC_SCREENSHOT_PATHS)
+        for target in targets:
+            assert PUBLIC_SCREENSHOTS[target].is_file(), (
+                f"missing public screenshot referenced by {document.name}: {target}"
+            )
+
+
+def test_public_documentation_media_is_strictly_allowlisted() -> None:
     for document in PUBLIC_DOCUMENTS:
         text = document.read_text(encoding="utf-8")
+        sanitized = text
+        if document in ROOT_READMES:
+            matches = list(MARKDOWN_IMAGE_RE.finditer(text))
+            for match in reversed(matches):
+                if match.group(1).strip() in PUBLIC_SCREENSHOT_PATHS:
+                    sanitized = sanitized[: match.start()] + sanitized[match.end() :]
         for pattern in FORBIDDEN_MEDIA_PATTERNS:
-            assert pattern.search(text) is None, f"forbidden media syntax in {document.name}"
+            assert pattern.search(sanitized) is None, (
+                f"forbidden media syntax in {document.name}"
+            )
 
 
 def test_public_documentation_relative_links_resolve_inside_repository() -> None:

@@ -29,6 +29,18 @@ local application materials
 
 Form filling, application records, and mail ingestion all retain the same rule: raw candidate material and raw mail content do not become public repository data.
 
+## Interface preview
+
+The screenshots below come from the isolated synthetic demo. Every company, role, date, and timeline event is fictional; no personal application data is included.
+
+![Synthetic application board showing compact cards](docs/assets/screenshots/demo-board.png)
+
+Board cards show only the company and role. Select a card to open its full details, or drag it between columns when the application stage changes.
+
+![Synthetic assessment record detail](docs/assets/screenshots/demo-assessment-detail.png)
+
+The assessment detail shows the current stage, deadline, event timeline, and next action. Updating a tracked status records progress only; it never replaces the user's final review and submission on the recruitment site.
+
 ## Try the synthetic demo
 
 The demo uses six clearly fictional records in an isolated system-temporary directory. It does not initialize `private/`, mount Agent or mail routes, or use mailbox credentials. All demo changes disappear with the session.
@@ -44,7 +56,13 @@ Open [http://127.0.0.1:8001](http://127.0.0.1:8001). Use the in-page reset actio
 pwsh -NoProfile -File .\scripts\Start-Demo.ps1 -Reset
 ```
 
-The demo server is foreground-only. Press Ctrl+C to stop it and clean its session directory.
+Once the demo is running:
+
+1. Browse the board and select any card to inspect its details.
+2. Filter by `笔试 / 测评`, then open the fictional Qinghe record to review its assessment timeline.
+3. Use the in-page reset action to restore the sample records, or press Ctrl+C to stop the server and clean the session directory.
+
+The demo server is foreground-only.
 
 ## Run with your local workspace
 

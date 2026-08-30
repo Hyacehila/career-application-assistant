@@ -51,6 +51,11 @@ $skillFiles = @(
     '.agents/skills/job-discovery/SKILL.md'
 )
 
+$publicScreenshotFiles = @(
+    'docs/assets/screenshots/demo-board.png',
+    'docs/assets/screenshots/demo-assessment-detail.png'
+)
+
 $coreExactFiles = @(
     '.gitignore',
     'AGENTS.md',
@@ -69,6 +74,7 @@ $allowedExactFiles = @(
     $documentationFiles | Where-Object { $_ -like 'docs/*' }
     $githubFiles
     $skillFiles
+    $publicScreenshotFiles
 ) | Select-Object -Unique
 
 $requiredFiles = @(
@@ -77,6 +83,7 @@ $requiredFiles = @(
     $documentationFiles | Where-Object { $_ -like 'docs/*' }
     $githubFiles
     $skillFiles
+    $publicScreenshotFiles
     'app/README.md',
     'app/server.py',
     'app/demo_server.py',
@@ -138,8 +145,12 @@ function Write-CheckResult {
 function Test-ForbiddenPath {
     param([Parameter(Mandatory = $true)][string] $Path)
 
+    $normalized = $Path.Replace('\', '/')
+    if ($normalized -cin $publicScreenshotFiles) {
+        return $false
+    }
     foreach ($pattern in $forbiddenPathPatterns) {
-        if ($Path -match $pattern) {
+        if ($normalized -match $pattern) {
             return $true
         }
     }
@@ -176,6 +187,88 @@ function Test-BytePrefix {
         }
     }
     return $true
+}
+
+function Read-PngUInt32BigEndian {
+    param(
+        [Parameter(Mandatory = $true)][byte[]] $Bytes,
+        [Parameter(Mandatory = $true)][int] $Offset
+    )
+
+    if ($Offset -lt 0 -or $Bytes.Length -lt ($Offset + 4)) {
+        throw 'PNG integer is outside the byte buffer.'
+    }
+    $value = ([uint64] $Bytes[$Offset] * 16777216) +
+        ([uint64] $Bytes[$Offset + 1] * 65536) +
+        ([uint64] $Bytes[$Offset + 2] * 256) +
+        [uint64] $Bytes[$Offset + 3]
+    return [uint32] $value
+}
+
+function Test-PublicScreenshotSafe {
+    param([AllowNull()][byte[]] $Bytes)
+
+    $pngSignature = [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    if ($null -eq $Bytes -or $Bytes.Length -lt 1024 -or $Bytes.Length -gt (5 * 1024 * 1024)) {
+        return $false
+    }
+    if (-not (Test-BytePrefix -Bytes $Bytes -Prefix $pngSignature)) {
+        return $false
+    }
+
+    $offset = 8
+    $chunkIndex = 0
+    $seenHeader = $false
+    $seenImageData = $false
+    $forbiddenMetadataChunks = @('tEXt', 'zTXt', 'iTXt', 'eXIf')
+
+    while ($offset -lt $Bytes.Length) {
+        if (($Bytes.Length - $offset) -lt 12) {
+            return $false
+        }
+
+        $chunkLength = [uint64](Read-PngUInt32BigEndian -Bytes $Bytes -Offset $offset)
+        $chunkType = [Text.Encoding]::ASCII.GetString($Bytes, $offset + 4, 4)
+        if ($chunkType -cnotmatch '^[A-Za-z]{4}$') {
+            return $false
+        }
+
+        $nextOffset = [uint64] $offset + 12 + $chunkLength
+        if ($nextOffset -gt [uint64] $Bytes.Length) {
+            return $false
+        }
+        if ($forbiddenMetadataChunks -ccontains $chunkType) {
+            return $false
+        }
+
+        if ($chunkIndex -eq 0 -and $chunkType -cne 'IHDR') {
+            return $false
+        }
+        if ($chunkType -ceq 'IHDR') {
+            if ($seenHeader -or $chunkLength -ne 13) {
+                return $false
+            }
+            $width = Read-PngUInt32BigEndian -Bytes $Bytes -Offset ($offset + 8)
+            $height = Read-PngUInt32BigEndian -Bytes $Bytes -Offset ($offset + 12)
+            if ($width -lt 640 -or $width -gt 3840 -or $height -lt 360 -or $height -gt 2160) {
+                return $false
+            }
+            $seenHeader = $true
+        } elseif ($chunkType -ceq 'IDAT') {
+            if (-not $seenHeader -or $chunkLength -eq 0) {
+                return $false
+            }
+            $seenImageData = $true
+        } elseif ($chunkType -ceq 'IEND') {
+            return $seenHeader -and $seenImageData -and $chunkLength -eq 0 -and
+                $nextOffset -eq [uint64] $Bytes.Length
+        }
+
+        $offset = [int] $nextOffset
+        $chunkIndex += 1
+    }
+
+    return $false
 }
 
 function Test-MediaSignature {
@@ -246,9 +339,40 @@ function Test-MediaSignature {
 }
 
 function Test-DocumentationTextSafe {
-    param([AllowNull()][string] $Text)
+    param(
+        [AllowNull()][string] $Text,
+        [Parameter(Mandatory = $true)][string] $DocumentPath
+    )
 
     if ($null -eq $Text) {
+        return $false
+    }
+
+    $normalizedDocumentPath = $DocumentPath.Replace('\', '/')
+    $readmeScreenshotTargets = @(
+        'docs/assets/screenshots/demo-board.png',
+        'docs/assets/screenshots/demo-assessment-detail.png'
+    )
+    $markdownImagePattern = [regex]::new('!\[[^\]\r\n]*\]\s*\(([^)\r\n]+)\)')
+    $imageMatches = @($markdownImagePattern.Matches($Text))
+    $isScreenshotReadme = $normalizedDocumentPath -cin @('README.md', 'README.zh-CN.md')
+    $sanitizedText = $Text
+
+    if ($isScreenshotReadme) {
+        if ($imageMatches.Count -ne $readmeScreenshotTargets.Count) {
+            return $false
+        }
+        $imageTargets = @($imageMatches | ForEach-Object { $_.Groups[1].Value.Trim() })
+        foreach ($target in $readmeScreenshotTargets) {
+            if (@($imageTargets | Where-Object { $_ -ceq $target }).Count -ne 1) {
+                return $false
+            }
+        }
+        if (@($imageTargets | Where-Object { $_ -cnotin $readmeScreenshotTargets }).Count -ne 0) {
+            return $false
+        }
+        $sanitizedText = $markdownImagePattern.Replace($Text, '')
+    } elseif ($imageMatches.Count -ne 0) {
         return $false
     }
 
@@ -263,11 +387,49 @@ function Test-DocumentationTextSafe {
         '(?i)https?://[^\s<>\)]+\.(?:png|jpe?g|gif|webp|svg|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)(?:[?#][^\s<>\)]*)?'
     )
     foreach ($pattern in $forbiddenDocumentPatterns) {
-        if ($Text -match $pattern) {
+        if ($sanitizedText -match $pattern) {
             return $false
         }
     }
     return $true
+}
+
+function New-PolicyPngFixture {
+    param([AllowEmptyString()][string] $MetadataChunk = '')
+
+    $signature = [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    $headerData = [byte[]](
+        0x00, 0x00, 0x05, 0x00, # 1280 pixels
+        0x00, 0x00, 0x02, 0xd0, # 720 pixels
+        0x08, 0x06, 0x00, 0x00, 0x00
+    )
+    $headerChunk = [byte[]](
+        ([byte[]](0x00, 0x00, 0x00, 0x0d)) +
+        [Text.Encoding]::ASCII.GetBytes('IHDR') +
+        $headerData +
+        ([byte[]](0x00, 0x00, 0x00, 0x00))
+    )
+    $metadataBytes = [byte[]]@()
+    if (-not [string]::IsNullOrEmpty($MetadataChunk)) {
+        $metadataBytes = [byte[]](
+            ([byte[]](0x00, 0x00, 0x00, 0x00)) +
+            [Text.Encoding]::ASCII.GetBytes($MetadataChunk) +
+            ([byte[]](0x00, 0x00, 0x00, 0x00))
+        )
+    }
+    $imageData = [byte[]]::new(1024)
+    $imageChunk = [byte[]](
+        ([byte[]](0x00, 0x00, 0x04, 0x00)) +
+        [Text.Encoding]::ASCII.GetBytes('IDAT') +
+        $imageData +
+        ([byte[]](0x00, 0x00, 0x00, 0x00))
+    )
+    $endChunk = [byte[]](
+        ([byte[]](0x00, 0x00, 0x00, 0x00)) +
+        [Text.Encoding]::ASCII.GetBytes('IEND') +
+        ([byte[]](0x00, 0x00, 0x00, 0x00))
+    )
+    return ,([byte[]]($signature + $headerChunk + $metadataBytes + $imageChunk + $endChunk))
 }
 
 function Invoke-PolicySelfTest {
@@ -287,6 +449,8 @@ function Invoke-PolicySelfTest {
 
     $allowedSamples = @(
         'README.md',
+        'docs/assets/screenshots/demo-board.png',
+        'docs/assets/screenshots/demo-assessment-detail.png',
         '.agents/skills/job-discovery/SKILL.md',
         'app/backend/app.py',
         'scripts/Start-Demo.ps1',
@@ -300,6 +464,10 @@ function Invoke-PolicySelfTest {
         '.github/workflows/extra.yml',
         '.github/PULL_REQUEST_TEMPLATE.md',
         'app/demo.png',
+        'docs/assets/screenshots/demo-board-copy.png',
+        'docs/assets/screenshots/demo-assessment.png',
+        'docs/assets/screenshots/demo-third.png',
+        'docs/assets/screenshots/archive/demo-board.png',
         'scripts/walkthrough.mp4'
     )
 
@@ -308,6 +476,17 @@ function Invoke-PolicySelfTest {
     )
     Write-CheckResult -Name 'policy-allowlist-negative' -Passed (
         @($rejectedSamples | Where-Object { Test-AllowedPublicPath -Path $_ }).Count -eq 0
+    )
+    Write-CheckResult -Name 'policy-screenshot-paths-exact-positive' -Passed (
+        @($publicScreenshotFiles | Where-Object { -not (Test-AllowedPublicPath -Path $_) }).Count -eq 0
+    )
+    Write-CheckResult -Name 'policy-screenshot-paths-near-miss-negative' -Passed (
+        @(
+            'docs/assets/screenshots/demo-board-copy.png',
+            'docs/assets/screenshots/demo-assessment.png',
+            'docs/assets/screenshots/demo-third.png',
+            'docs/assets/screenshots/archive/demo-board.png'
+        | Where-Object { Test-AllowedPublicPath -Path $_ }).Count -eq 0
     )
     Write-CheckResult -Name 'policy-required-paths' -Passed (
         @($requiredPolicyPaths | Where-Object { $_ -notin $requiredFiles }).Count -eq 0
@@ -331,6 +510,17 @@ function Invoke-PolicySelfTest {
         -not (Test-MediaSignature -Bytes ([Text.Encoding]::UTF8.GetBytes('# Plain text')))
     )
 
+    $validScreenshotFixture = New-PolicyPngFixture
+    Write-CheckResult -Name 'policy-public-screenshot-positive' -Passed (
+        Test-PublicScreenshotSafe -Bytes $validScreenshotFixture
+    )
+    $forbiddenPngMetadata = @('tEXt', 'zTXt', 'iTXt', 'eXIf')
+    Write-CheckResult -Name 'policy-public-screenshot-metadata-negative' -Passed (
+        @($forbiddenPngMetadata | Where-Object {
+            Test-PublicScreenshotSafe -Bytes (New-PolicyPngFixture -MetadataChunk $_)
+        }).Count -eq 0
+    )
+
     $unsafeDocuments = @(
         '![preview](preview.png)',
         '<img src="preview.example.test">',
@@ -340,10 +530,32 @@ function Invoke-PolicySelfTest {
         '<https://media.example.test/walkthrough.mp4>'
     )
     Write-CheckResult -Name 'policy-document-media-positive' -Passed (
-        Test-DocumentationTextSafe -Text '# Text-only documentation`n[Guide](docs/README.md)'
+        Test-DocumentationTextSafe -Text '# Text-only documentation`n[Guide](docs/README.md)' -DocumentPath 'docs/development.md'
     )
     Write-CheckResult -Name 'policy-document-media-negative' -Passed (
-        @($unsafeDocuments | Where-Object { Test-DocumentationTextSafe -Text $_ }).Count -eq 0
+        @($unsafeDocuments | Where-Object {
+            Test-DocumentationTextSafe -Text $_ -DocumentPath 'docs/development.md'
+        }).Count -eq 0
+    )
+
+    $safeScreenshotReadme = @'
+# Demo
+
+![Board](docs/assets/screenshots/demo-board.png)
+![Assessment](docs/assets/screenshots/demo-assessment-detail.png)
+'@
+    $unsafeScreenshotReadmes = @(
+        $safeScreenshotReadme.Replace('demo-board.png', 'demo-board-copy.png'),
+        ($safeScreenshotReadme + "`n![Third](docs/assets/screenshots/demo-third.png)"),
+        ($safeScreenshotReadme + "`n![Remote](https://media.example.test/demo-board.png)")
+    )
+    Write-CheckResult -Name 'policy-document-screenshot-exact-positive' -Passed (
+        Test-DocumentationTextSafe -Text $safeScreenshotReadme -DocumentPath 'README.md'
+    )
+    Write-CheckResult -Name 'policy-document-screenshot-near-miss-negative' -Passed (
+        @($unsafeScreenshotReadmes | Where-Object {
+            Test-DocumentationTextSafe -Text $_ -DocumentPath 'README.md'
+        }).Count -eq 0
     )
 
     if ($script:FailureCount -eq 0) {
@@ -503,7 +715,11 @@ foreach ($trackedFile in $trackedFiles) {
     } else {
         Get-WorkTreeBytes -Root $repositoryRoot -Path $trackedFile
     }
-    $signatureSafe = $null -ne $bytes -and -not (Test-MediaSignature -Bytes $bytes)
+    $signatureSafe = if ($publicScreenshotFiles -ccontains $trackedFile) {
+        Test-PublicScreenshotSafe -Bytes $bytes
+    } else {
+        $null -ne $bytes -and -not (Test-MediaSignature -Bytes $bytes)
+    }
     Write-CheckResult -Name "public-signature:$trackedFile" -Passed $signatureSafe
 
     $extension = [IO.Path]::GetExtension($trackedFile).ToLowerInvariant()
@@ -543,7 +759,7 @@ foreach ($documentFile in $documentationFiles) {
         Get-WorkTreeText -Root $repositoryRoot -Path $documentFile
     }
     Write-CheckResult -Name "text-only-document:$documentFile" -Passed (
-        Test-DocumentationTextSafe -Text $documentText
+        Test-DocumentationTextSafe -Text $documentText -DocumentPath $documentFile
     )
 }
 
