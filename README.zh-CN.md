@@ -67,6 +67,7 @@ pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 
 ## 功能摘要
 
+- 仓库级 `$job-discovery` Skill：只读检查用户明确提供的公司招聘链接，并仅依据本地资料给出证据化岗位匹配清单，不自动保存或投递。
 - 五列看板与详细表格，支持搜索、筛选、排序、分页、响应式布局、详情、下一步事项和软删除。
 - 十个精确状态以追加式、经过校验的时间线事件表示；`applied` 始终要求用户明确确认。
 - 通过类型化 Agent 接口和 PowerShell 封装命令记录已准备的表单与后续状态，无需直接操作 SQLite。

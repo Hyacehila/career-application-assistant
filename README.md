@@ -67,6 +67,7 @@ The initializer is safe to repeat: it creates `private/resume_materials.md` from
 
 ## Features
 
+- A repository-scoped `$job-discovery` skill that read-only inspects company career URLs supplied by the user and produces an evidence-backed shortlist from local materials without saving or applying.
 - Five-column board and detailed table with search, filters, sorting, pagination, responsive layout, details, next actions, and soft deletion.
 - Ten precise statuses represented as append-only, validated timeline events; `applied` always requires explicit user confirmation.
 - Typed Agent endpoints and a PowerShell wrapper for recording prepared forms and later status updates without direct SQLite access.

@@ -47,6 +47,10 @@ $githubFiles = @(
     '.github/workflows/ci.yml'
 )
 
+$skillFiles = @(
+    '.agents/skills/job-discovery/SKILL.md'
+)
+
 $coreExactFiles = @(
     '.gitignore',
     'AGENTS.md',
@@ -64,6 +68,7 @@ $allowedExactFiles = @(
     $communityFiles
     $documentationFiles | Where-Object { $_ -like 'docs/*' }
     $githubFiles
+    $skillFiles
 ) | Select-Object -Unique
 
 $requiredFiles = @(
@@ -71,6 +76,7 @@ $requiredFiles = @(
     $communityFiles
     $documentationFiles | Where-Object { $_ -like 'docs/*' }
     $githubFiles
+    $skillFiles
     'app/README.md',
     'app/server.py',
     'app/demo_server.py',
@@ -277,10 +283,11 @@ function Invoke-PolicySelfTest {
         'app/tests/test_public_documentation.py',
         'app/tests/test_public_scripts.py',
         'app/tests/test_startup.py'
-    ) + $communityFiles + ($documentationFiles | Where-Object { $_ -like 'docs/*' }) + $githubFiles
+    ) + $communityFiles + ($documentationFiles | Where-Object { $_ -like 'docs/*' }) + $githubFiles + $skillFiles
 
     $allowedSamples = @(
         'README.md',
+        '.agents/skills/job-discovery/SKILL.md',
         'app/backend/app.py',
         'scripts/Start-Demo.ps1',
         'docs/security-and-privacy.zh-CN.md',
