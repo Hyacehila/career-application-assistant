@@ -11,6 +11,7 @@ Tracked public content includes application code and tests in `app/`, safety and
 Local ignored content includes:
 
 - `private/resume_materials.md`;
+- `private/job_search_preferences.md`;
 - `private/applications.sqlite` and other SQLite files;
 - resumes, documents, photographs, certificates, and other attachments;
 - local attachment hashes, environments, caches, editor state, and frontend build output.
@@ -20,6 +21,8 @@ Git ignore rules do not stop operating-system backups or cloud-folder synchroniz
 ## Data sources and browser boundary
 
 For live form filling, `private/resume_materials.md` is the only permitted source for field values, options, and declarations. Codex does not infer fields from uploaded documents, the recruitment page, browser history, autofill, external search, or the public example template.
+
+For job discovery, explicit constraints in the current request take priority over the long-term scope and ranking preferences in `private/job_search_preferences.md`; `private/resume_materials.md` remains the only source for candidate facts and qualification evidence. Codex first selects relevant career-site category filters, covers their accessible result pages without a fixed job quota, and reads plausible detailed job descriptions before matching. Keyword search is only supplemental and never represents whole-site coverage. Discovery remains inside the company recruitment flow supplied by the user and cannot fill, save, or apply.
 
 The user opens the recruitment page and explicitly requests filling. Codex may prepare high-confidence fields, replace a declared attachment in the current application, and use clearly intermediate controls. It must stop before final submission and for authentication, verification, payment, account creation, background-check consent, ambiguous declarations, required missing facts, or unsafe attachment operations.
 

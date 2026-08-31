@@ -33,6 +33,7 @@ $frontendRoot = Join-Path $repositoryRoot 'app\frontend'
 $frontendModules = Join-Path $frontendRoot 'node_modules'
 $frontendBuild = Join-Path $frontendRoot 'dist\index.html'
 $materialsPath = Join-Path $repositoryRoot 'private\resume_materials.md'
+$preferencesPath = Join-Path $repositoryRoot 'private\job_search_preferences.md'
 $port = if ($Mode -eq 'Demo') { 8001 } else { 8000 }
 $expectedMode = $Mode.ToLowerInvariant()
 
@@ -80,7 +81,8 @@ Write-CheckResult -Name 'frontend-dependencies' -Passed (Test-Path -LiteralPath 
 Write-CheckResult -Name 'frontend-production-build' -Passed (Test-Path -LiteralPath $frontendBuild -PathType Leaf)
 
 $privateOverlayReady = if ($Mode -eq 'Standard') {
-    Test-Path -LiteralPath $materialsPath -PathType Leaf
+    (Test-Path -LiteralPath $materialsPath -PathType Leaf) -and
+    (Test-Path -LiteralPath $preferencesPath -PathType Leaf)
 } else {
     $true
 }

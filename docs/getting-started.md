@@ -55,9 +55,9 @@ Initialize the private overlay:
 pwsh -NoProfile -File .\scripts\Initialize-PrivateOverlay.ps1
 ```
 
-If `private/resume_materials.md` already exists as a file, the command reports success without reading or replacing it. If it is missing, only the public `resume_materials.example.md` placeholder is copied. Other files in `private/` are not enumerated, changed, or deleted.
+The command initializes `private/resume_materials.md` and `private/job_search_preferences.md` independently from their public example templates. An existing destination file is reported without being read or replaced, while a missing destination is created. Other files in `private/` are not enumerated, changed, or deleted.
 
-Complete the generated material file and add only the attachments declared there. Validate the local workspace without exposing values:
+Complete both generated files, using the preference file only for discovery scope and ranking, and add only the attachments declared in the material file. Validate the local workspace without exposing values:
 
 ```powershell
 pwsh -NoProfile -File .\scripts\Test-PrivateWorkspace.ps1 -WorkspaceRoot .\private -InitializeResumeHash

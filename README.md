@@ -2,13 +2,14 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Career Application Assistant is a local, single-user workflow for preparing a job application up to the final-submit boundary, reviewing it yourself, and then tracking progress as a structured event timeline.
+Career Application Assistant is a local, single-user workflow for discovering relevant roles, preparing a job application up to the final-submit boundary, reviewing it yourself, and then tracking progress as a structured event timeline.
 
-It brings three practical pieces together:
+It brings four practical pieces together:
 
-1. Guarded form preparation: Codex uses only the explicitly maintained local material file, fills the recruitment page already open in Chrome, and stops before final submission.
-2. A useful local record: the board and table views keep job metadata, next actions, and validated stage events in one loopback-only application.
-3. Optional read-only mail intake: Outlook, QQ Mail, and 163 Mail can produce bounded structured review candidates without turning the project into an inbox client.
+1. Preference-driven job discovery: Codex explores relevant filters and detailed job descriptions within company career URLs you supply, then compares them with local evidence.
+2. Guarded form preparation: Codex uses only the explicitly maintained local material file, fills the recruitment page already open in Chrome, and stops before final submission.
+3. A useful local record: the board and table views keep job metadata, next actions, and validated stage events in one loopback-only application.
+4. Optional read-only mail intake: Outlook, QQ Mail, and 163 Mail can produce bounded structured review candidates without turning the project into an inbox client.
 
 > [!IMPORTANT]
 > `private/` is Git-ignored local storage, not an encrypted vault. Protect the workspace, review backups and sync settings, and run the public-release check before publishing changes.
@@ -20,7 +21,9 @@ This project is not an auto-apply or bulk-application system. It never performs 
 The supported flow is deliberately simple:
 
 ```text
-local application materials
+local job preferences and application materials
+        -> Codex inspects relevant filters and detailed job descriptions
+        -> user selects a role
         -> Codex prepares the open recruitment form
         -> user reviews and personally submits
         -> structured events update the local timeline
@@ -81,11 +84,11 @@ pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The standard service accepts only the fixed `private/applications.sqlite` data file and listens only on loopback.
 
-The initializer is safe to repeat: it creates `private/resume_materials.md` from the public placeholder only when that file is missing, and it neither reads nor replaces an existing material file. Complete setup and validation are covered in [Getting started](docs/getting-started.md).
+The initializer is safe to repeat: it creates missing `private/resume_materials.md` and `private/job_search_preferences.md` files from their public placeholder templates, without reading or replacing either existing file. Complete setup and validation are covered in [Getting started](docs/getting-started.md).
 
 ## Features
 
-- A repository-scoped `$job-discovery` skill that read-only inspects company career URLs supplied by the user and produces an evidence-backed shortlist from local materials without saving or applying.
+- A repository-scoped `$job-discovery` skill that uses private search preferences to select relevant career-site filters, traverses their accessible result pages without a fixed job quota, reads plausible job descriptions in depth, and produces an evidence-backed shortlist without saving or applying.
 - Five-column board and detailed table with search, filters, sorting, pagination, responsive layout, details, next actions, and soft deletion.
 - Ten precise statuses represented as append-only, validated timeline events; `applied` always requires explicit user confirmation.
 - Typed Agent endpoints and a PowerShell wrapper for recording prepared forms and later status updates without direct SQLite access.

@@ -55,9 +55,9 @@ pwsh -NoProfile -File .\scripts\Start-Demo.ps1 -Reset
 pwsh -NoProfile -File .\scripts\Initialize-PrivateOverlay.ps1
 ```
 
-如果 `private/resume_materials.md` 已是文件，命令只报告成功，不读取或替换它；如果缺失，则只复制公开的 `resume_materials.example.md` 占位模板。`private/` 中的其他文件不会被枚举、修改或删除。
+命令会分别从公开示例模板初始化 `private/resume_materials.md` 和 `private/job_search_preferences.md`。目标文件已存在时只报告状态，不读取或替换；缺失时才创建。`private/` 中的其他文件不会被枚举、修改或删除。
 
-补全生成的资料文件，只加入其中明确声明的附件，然后在不输出真实值的前提下校验工作区：
+补全两个生成文件；岗位偏好文件只用于发现范围和排序，附件只按简历资料文件中的声明加入。然后在不输出真实值的前提下校验工作区：
 
 ```powershell
 pwsh -NoProfile -File .\scripts\Test-PrivateWorkspace.ps1 -WorkspaceRoot .\private -InitializeResumeHash

@@ -38,6 +38,9 @@ def _initializer_fixture(tmp_path: Path) -> tuple[Path, Path]:
     script = scripts / "Initialize-PrivateOverlay.ps1"
     shutil.copy2(REPOSITORY_ROOT / "scripts" / script.name, script)
     (root / "resume_materials.example.md").write_text("# Public placeholder\n", encoding="utf-8")
+    (root / "job_search_preferences.example.md").write_text(
+        "# Discovery placeholder\n", encoding="utf-8"
+    )
     return root, script
 
 
@@ -51,27 +54,60 @@ def test_private_overlay_initializer_is_safe_and_idempotent(tmp_path: Path) -> N
     first = _run_script(script, cwd=root)
     assert first.returncode == 0, first.stdout + first.stderr
     materials = private_root / "resume_materials.md"
+    preferences = private_root / "job_search_preferences.md"
     assert materials.read_text(encoding="utf-8") == "# Public placeholder\n"
+    assert preferences.read_text(encoding="utf-8") == "# Discovery placeholder\n"
     assert unrelated.read_text(encoding="utf-8") == "synthetic marker"
 
     materials.write_text("synthetic existing materials", encoding="utf-8")
+    preferences.write_text("synthetic existing preferences", encoding="utf-8")
     (root / "resume_materials.example.md").write_text("changed template", encoding="utf-8")
+    (root / "job_search_preferences.example.md").write_text(
+        "changed preference template", encoding="utf-8"
+    )
     second = _run_script(script, cwd=root)
     assert second.returncode == 0, second.stdout + second.stderr
     assert materials.read_text(encoding="utf-8") == "synthetic existing materials"
-    assert "was not read or changed" in second.stdout
+    assert preferences.read_text(encoding="utf-8") == "synthetic existing preferences"
+    assert second.stdout.count("was not read or changed") == 2
     assert unrelated.read_text(encoding="utf-8") == "synthetic marker"
 
 
-@pytest.mark.parametrize("conflict", ["private", "materials"])
+@pytest.mark.parametrize(
+    "existing_name", ["resume_materials.md", "job_search_preferences.md"]
+)
+def test_private_overlay_initializer_creates_only_the_missing_file(
+    tmp_path: Path, existing_name: str
+) -> None:
+    root, script = _initializer_fixture(tmp_path)
+    private_root = root / "private"
+    private_root.mkdir()
+    existing = private_root / existing_name
+    existing.write_text("synthetic existing content", encoding="utf-8")
+
+    result = _run_script(script, cwd=root)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert existing.read_text(encoding="utf-8") == "synthetic existing content"
+    expected = {
+        "resume_materials.md": "# Public placeholder\n",
+        "job_search_preferences.md": "# Discovery placeholder\n",
+    }
+    missing_name = next(name for name in expected if name != existing_name)
+    assert (private_root / missing_name).read_text(encoding="utf-8") == expected[missing_name]
+
+
+@pytest.mark.parametrize("conflict", ["private", "materials", "preferences"])
 def test_private_overlay_initializer_rejects_conflicting_paths(
     tmp_path: Path, conflict: str
 ) -> None:
     root, script = _initializer_fixture(tmp_path)
     if conflict == "private":
         (root / "private").write_text("synthetic conflict", encoding="utf-8")
-    else:
+    elif conflict == "materials":
         (root / "private" / "resume_materials.md").mkdir(parents=True)
+    else:
+        (root / "private" / "job_search_preferences.md").mkdir(parents=True)
 
     result = _run_script(script, cwd=root)
     assert result.returncode != 0

@@ -8,11 +8,22 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $privateRoot = Join-Path $repositoryRoot 'private'
-$templatePath = Join-Path $repositoryRoot 'resume_materials.example.md'
-$materialsPath = Join-Path $privateRoot 'resume_materials.md'
+$overlayFiles = @(
+    @{
+        Template = 'resume_materials.example.md'
+        Destination = 'resume_materials.md'
+    },
+    @{
+        Template = 'job_search_preferences.example.md'
+        Destination = 'job_search_preferences.md'
+    }
+)
 
-if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) {
-    throw 'The public repository is missing resume_materials.example.md.'
+foreach ($overlayFile in $overlayFiles) {
+    $templatePath = Join-Path $repositoryRoot $overlayFile.Template
+    if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) {
+        throw "The public repository is missing $($overlayFile.Template)."
+    }
 }
 
 if (Test-Path -LiteralPath $privateRoot) {
@@ -24,18 +35,23 @@ else {
     New-Item -ItemType Directory -Path $privateRoot | Out-Null
 }
 
-if (Test-Path -LiteralPath $materialsPath) {
-    if (-not (Test-Path -LiteralPath $materialsPath -PathType Leaf)) {
-        throw 'private/resume_materials.md exists and is not a file.'
+foreach ($overlayFile in $overlayFiles) {
+    $templatePath = Join-Path $repositoryRoot $overlayFile.Template
+    $destinationPath = Join-Path $privateRoot $overlayFile.Destination
+    $displayPath = "private/$($overlayFile.Destination)"
+
+    if (Test-Path -LiteralPath $destinationPath) {
+        if (-not (Test-Path -LiteralPath $destinationPath -PathType Leaf)) {
+            throw "$displayPath exists and is not a file."
+        }
+
+        Write-Output "$displayPath is already initialized; existing content was not read or changed."
+        continue
     }
 
-    Write-Output 'RESULT: PASS'
-    Write-Output 'private/resume_materials.md is already initialized; existing content was not read or changed.'
-    exit 0
+    Copy-Item -LiteralPath $templatePath -Destination $destinationPath -ErrorAction Stop
+    Write-Output "Created $displayPath from the public placeholder template."
 }
 
-Copy-Item -LiteralPath $templatePath -Destination $materialsPath -ErrorAction Stop
-
 Write-Output 'RESULT: PASS'
-Write-Output 'Created private/resume_materials.md from the public placeholder template.'
 Write-Output 'Place personal attachments and applications.sqlite directly in private/.'

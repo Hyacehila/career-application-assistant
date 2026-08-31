@@ -123,7 +123,7 @@ if ([string]::IsNullOrWhiteSpace($workspaceRelative)) {
 $ignoreResult = & git -C $repositoryRoot check-ignore --quiet -- $workspaceRelative 2>$null
 Write-CheckResult -Name 'private-directory-is-gitignored' -Passed ($LASTEXITCODE -eq 0)
 
-$requiredFiles = @('resume_materials.md')
+$requiredFiles = @('resume_materials.md', 'job_search_preferences.md')
 
 foreach ($requiredFile in $requiredFiles) {
     $requiredPath = Join-Path $workspaceRoot $requiredFile
@@ -132,8 +132,10 @@ foreach ($requiredFile in $requiredFiles) {
 
 $agentsPath = Join-Path $repositoryRoot 'AGENTS.md'
 $materialsPath = Join-Path $workspaceRoot 'resume_materials.md'
+$preferencesPath = Join-Path $workspaceRoot 'job_search_preferences.md'
 $agentsText = if (Test-Path -LiteralPath $agentsPath -PathType Leaf) { Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8 } else { $null }
 $materialsText = if (Test-Path -LiteralPath $materialsPath -PathType Leaf) { Get-Content -LiteralPath $materialsPath -Raw -Encoding UTF8 } else { $null }
+$preferencesText = if (Test-Path -LiteralPath $preferencesPath -PathType Leaf) { Get-Content -LiteralPath $preferencesPath -Raw -Encoding UTF8 } else { $null }
 
 $requiredAgentRules = @(
     'Settings → Computer use',
@@ -158,8 +160,19 @@ foreach ($requiredMaterialSection in $requiredMaterialSections) {
     Write-CheckResult -Name 'required-material-section' -Passed $present
 }
 
-$hasPlaceholder = $null -eq $materialsText -or [regex]::IsMatch($materialsText, '<[^>`r`n]+>')
-Write-CheckResult -Name 'unresolved-placeholders-absent' -Passed (-not $hasPlaceholder)
+$requiredPreferenceSections = @(
+    '## 岗位范围',
+    '## 优先方向',
+    '## JD 判断偏好'
+)
+foreach ($requiredPreferenceSection in $requiredPreferenceSections) {
+    $present = $null -ne $preferencesText -and $preferencesText.Contains($requiredPreferenceSection)
+    Write-CheckResult -Name 'required-preference-section' -Passed $present
+}
+
+$materialsHavePlaceholder = $null -eq $materialsText -or [regex]::IsMatch($materialsText, '<[^>`r`n]+>')
+$preferencesHavePlaceholder = $null -eq $preferencesText -or [regex]::IsMatch($preferencesText, '<[^>`r`n]+>')
+Write-CheckResult -Name 'unresolved-placeholders-absent' -Passed (-not $materialsHavePlaceholder -and -not $preferencesHavePlaceholder)
 
 $resumeFullPath = $null
 if ($null -ne $materialsText) {

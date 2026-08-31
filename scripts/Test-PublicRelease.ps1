@@ -63,6 +63,7 @@ $coreExactFiles = @(
     'README.md',
     'README.zh-CN.md',
     'THIRD_PARTY_NOTICES.md',
+    'job_search_preferences.example.md',
     'pyproject.toml',
     'resume_materials.example.md',
     'uv.lock'
@@ -120,6 +121,7 @@ $requiredFiles = @(
 
 $forbiddenPathPatterns = @(
     '(^|/)resume_materials\.md$',
+    '(^|/)job_search_preferences\.md$',
     '(^|/)\.resume\.sha256$',
     '(^|/)(private|private-workspace)(/|$)',
     '\.(pdf|jpe?g|png|gif|webp|svg|docx?|sqlite3?|db|mp3|mp4|m4a|m4v|mov|avi|webm|wav|ogg|oga|opus|flac|aac|wma|wmv|mkv|mpeg|mpg|flv|aif|aiff|mid|midi)$'
@@ -449,6 +451,7 @@ function Invoke-PolicySelfTest {
 
     $allowedSamples = @(
         'README.md',
+        'job_search_preferences.example.md',
         'docs/assets/screenshots/demo-board.png',
         'docs/assets/screenshots/demo-assessment-detail.png',
         '.agents/skills/job-discovery/SKILL.md',
@@ -460,6 +463,8 @@ function Invoke-PolicySelfTest {
     )
     $rejectedSamples = @(
         'private/resume_materials.md',
+        'private/job_search_preferences.md',
+        'job_search_preferences.md',
         'docs/unreviewed.md',
         '.github/workflows/extra.yml',
         '.github/PULL_REQUEST_TEMPLATE.md',
@@ -765,6 +770,7 @@ foreach ($documentFile in $documentationFiles) {
 
 $agentsText = if ($Staged) { Get-IndexText -Path 'AGENTS.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'AGENTS.md' }
 $materialsText = if ($Staged) { Get-IndexText -Path 'resume_materials.example.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'resume_materials.example.md' }
+$preferencesText = if ($Staged) { Get-IndexText -Path 'job_search_preferences.example.md' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'job_search_preferences.example.md' }
 $e2eSpecText = if ($Staged) { Get-IndexText -Path 'app/frontend/e2e/agent-fill.spec.ts' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'app/frontend/e2e/agent-fill.spec.ts' }
 $e2eServerText = if ($Staged) { Get-IndexText -Path 'app/tests/e2e/mock_server.py' } else { Get-WorkTreeText -Root $repositoryRoot -Path 'app/tests/e2e/mock_server.py' }
 
@@ -780,6 +786,9 @@ $requiredAgentRules = @(
     '不愿自我披露',
     '最终提交',
     'private/resume_materials.md',
+    'private/job_search_preferences.md',
+    '不设置固定页数或岗位数量上限',
+    '不能把单个关键词结果视为全站结果',
     'app/',
     '## 投递记录与状态更新',
     'api/agent/fill-completed',
@@ -819,6 +828,18 @@ foreach ($section in $requiredMaterialSections) {
 
 $placeholderCount = if ($null -eq $materialsText) { 0 } else { [regex]::Matches($materialsText, '<[^>`r`n]+>').Count }
 Write-CheckResult -Name 'template-has-placeholders' -Passed ($placeholderCount -ge 30)
+
+$requiredPreferenceSections = @(
+    '## 岗位范围',
+    '## 优先方向',
+    '## JD 判断偏好'
+)
+foreach ($section in $requiredPreferenceSections) {
+    Write-CheckResult -Name 'required-preference-template-section' -Passed ($null -ne $preferencesText -and $preferencesText.Contains($section))
+}
+
+$preferencePlaceholderCount = if ($null -eq $preferencesText) { 0 } else { [regex]::Matches($preferencesText, '<[^>`r`n]+>').Count }
+Write-CheckResult -Name 'preference-template-has-placeholders' -Passed ($preferencePlaceholderCount -ge 6)
 
 if ($script:FailureCount -eq 0) {
     Write-Output 'RESULT: PASS'
