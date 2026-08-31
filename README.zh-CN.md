@@ -2,6 +2,8 @@
 
 [English](README.md) | 简体中文
 
+![求职投递助手产品预览](docs/assets/screenshots/career-application-assistant-hero.png)
+
 求职投递助手是一套本地单用户工作流：先发现相关岗位，再把招聘申请准备到最终提交前，由你本人复核并亲自提交，最后通过结构化事件时间线持续跟踪进展。
 
 它把四项实用能力放在一起：

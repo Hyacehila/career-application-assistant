@@ -2,6 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+![Career Application Assistant product preview](docs/assets/screenshots/career-application-assistant-hero.png)
+
 Career Application Assistant is a local, single-user workflow for discovering relevant roles, preparing a job application up to the final-submit boundary, reviewing it yourself, and then tracking progress as a structured event timeline.
 
 It brings four practical pieces together:

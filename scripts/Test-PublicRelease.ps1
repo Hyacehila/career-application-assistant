@@ -52,6 +52,7 @@ $skillFiles = @(
 )
 
 $publicScreenshotFiles = @(
+    'docs/assets/screenshots/career-application-assistant-hero.png',
     'docs/assets/screenshots/demo-board.png',
     'docs/assets/screenshots/demo-assessment-detail.png'
 )
@@ -352,6 +353,7 @@ function Test-DocumentationTextSafe {
 
     $normalizedDocumentPath = $DocumentPath.Replace('\', '/')
     $readmeScreenshotTargets = @(
+        'docs/assets/screenshots/career-application-assistant-hero.png',
         'docs/assets/screenshots/demo-board.png',
         'docs/assets/screenshots/demo-assessment-detail.png'
     )
@@ -452,6 +454,7 @@ function Invoke-PolicySelfTest {
     $allowedSamples = @(
         'README.md',
         'job_search_preferences.example.md',
+        'docs/assets/screenshots/career-application-assistant-hero.png',
         'docs/assets/screenshots/demo-board.png',
         'docs/assets/screenshots/demo-assessment-detail.png',
         '.agents/skills/job-discovery/SKILL.md',
@@ -469,6 +472,7 @@ function Invoke-PolicySelfTest {
         '.github/workflows/extra.yml',
         '.github/PULL_REQUEST_TEMPLATE.md',
         'app/demo.png',
+        'docs/assets/screenshots/career-application-assistant-hero-copy.png',
         'docs/assets/screenshots/demo-board-copy.png',
         'docs/assets/screenshots/demo-assessment.png',
         'docs/assets/screenshots/demo-third.png',
@@ -487,6 +491,8 @@ function Invoke-PolicySelfTest {
     )
     Write-CheckResult -Name 'policy-screenshot-paths-near-miss-negative' -Passed (
         @(
+            'docs/assets/screenshots/career-application-assistant-hero-copy.png',
+            'docs/assets/screenshots/career-application-assistant-cover.png',
             'docs/assets/screenshots/demo-board-copy.png',
             'docs/assets/screenshots/demo-assessment.png',
             'docs/assets/screenshots/demo-third.png',
@@ -546,6 +552,7 @@ function Invoke-PolicySelfTest {
     $safeScreenshotReadme = @'
 # Demo
 
+![Hero](docs/assets/screenshots/career-application-assistant-hero.png)
 ![Board](docs/assets/screenshots/demo-board.png)
 ![Assessment](docs/assets/screenshots/demo-assessment-detail.png)
 '@

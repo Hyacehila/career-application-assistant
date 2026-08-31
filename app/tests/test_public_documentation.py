@@ -37,6 +37,7 @@ PUBLIC_DOCUMENTS = [
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]\r\n]*\]\s*\(([^)\r\n]+)\)")
 PUBLIC_SCREENSHOT_PATHS = (
+    "docs/assets/screenshots/career-application-assistant-hero.png",
     "docs/assets/screenshots/demo-board.png",
     "docs/assets/screenshots/demo-assessment-detail.png",
 )

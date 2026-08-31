@@ -15,6 +15,7 @@
 *.jpg
 *.jpeg
 *.png
+!docs/assets/screenshots/career-application-assistant-hero.png
 !docs/assets/screenshots/demo-board.png
 !docs/assets/screenshots/demo-assessment-detail.png
 *.gif
