@@ -34,7 +34,7 @@ class Handler(BaseHTTPRequestHandler):
         payload = json.dumps({
             "status": "ok",
             "database": "available",
-            "schema_version": 3,
+            "schema_version": 4,
             "service": "career-application-assistant",
             "mode": "standard",
             "synthetic_data": False,

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
+import Info from "lucide-react/dist/esm/icons/info";
 import Filters from "./Filters";
 import { cn } from "../lib/classNames";
 import { useIsMobile } from "../lib/useIsMobile";
@@ -156,6 +157,7 @@ export default function AppShell({
       </header>
       {demoMode ? (
         <aside className={styles.demoNotice} data-testid="demo-notice" aria-label="合成演示数据">
+          <Info size={16} aria-hidden="true" className={styles.demoNoticeIcon} />
           <p>
             <strong>合成演示数据</strong>
             <span>所有公司、岗位和时间线均为虚构；操作只影响本次临时会话。</span>

@@ -210,18 +210,18 @@ describe("响应式：窄屏（max-width 767px）", () => {
     const mobileCardRule = css.match(/\.mobileColumn \.card\s*\{([^}]*)\}/s)?.[1];
 
     expect(cardRule).toBeDefined();
-    expect(cardRule).toContain("gap: 4px");
-    expect(cardRule).toContain("min-height: 44px");
-    expect(cardRule).toContain("padding: 10px 12px");
+    expect(cardRule).toContain("gap: 10px");
+    expect(cardRule).toContain("min-height: 100px");
+    expect(cardRule).toContain("padding: 13px 14px 12px");
     expect(companyRule).toContain("white-space: nowrap");
     expect(companyRule).toContain("text-overflow: ellipsis");
     expect(companyRule).toContain("overflow: hidden");
     expect(jobRule).toContain("-webkit-line-clamp: 2");
     expect(jobRule).toContain("-webkit-box-orient: vertical");
     expect(jobRule).toContain("overflow: hidden");
-    expect(mobileCardRule).toContain("min-height: 44px");
+    expect(mobileCardRule).toContain("min-height: 96px");
     expect(mobileCardRule).not.toContain("grid-template-columns");
-    expect(css).not.toContain("min-height: 112px");
+    expect(css).toContain("scrollbar-width: none");
   });
 
   it("表格渲染紧凑行：无九列 columnheader，保留行点击与分页条", async () => {
@@ -247,7 +247,7 @@ describe("响应式：窄屏（max-width 767px）", () => {
     const row = screen.getByTestId("table-row-1");
     expect(row).toHaveTextContent("示例科技");
     expect(row).toHaveTextContent("前端工程师");
-    expect(row).toHaveTextContent("待确认投递");
+    expect(row).toHaveTextContent("创建于 2026-08-20");
     // 选中态指示
     const selectedRow = screen.getByTestId("table-row-2");
     expect(selectedRow.className).toContain("mobileRowSelected");

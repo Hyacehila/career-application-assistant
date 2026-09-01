@@ -21,6 +21,8 @@ function metaLineOf(event: ApplicationEvent): string {
     const deadlineTime = formatTime(event.deadline_time)
     parts.push(`截止 ${deadlineDate}${deadlineTime ? ` ${deadlineTime}` : ''}`)
   }
+  const completedDate = formatDate(event.completed_date)
+  if (completedDate) parts.push(`完成 ${completedDate}`)
   if (event.mode) {
     const modeLabels: Record<string, string> = { online: '线上', offline: '线下', phone: '电话' }
     parts.push(modeLabels[event.mode] ?? event.mode)

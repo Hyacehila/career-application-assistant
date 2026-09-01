@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .clock import today_date
 from .errors import ApiError, CODE_VALIDATION, validation_error
 
 DATE_RE = r"^\d{4}-\d{2}-\d{2}$"
@@ -40,6 +41,13 @@ def _check_date(value: str | None, name: str) -> str | None:
     except ValueError:
         raise ValueError(f"{name} is not a valid calendar date")
     return value
+
+
+def _check_completed_date(value: str | None) -> str | None:
+    checked = _check_date(value, "completed_date")
+    if checked is not None and checked > today_date():
+        raise ValueError("completed_date must not be in the future")
+    return checked
 
 
 def _check_timestamp(value: str, name: str) -> str:
@@ -157,6 +165,7 @@ class EventOut(BaseOut):
     scheduled_time: str | None = None
     deadline_date: str | None = None
     deadline_time: str | None = None
+    completed_date: str | None = None
     timezone: str
     mode: str | None = None
     location: str | None = None
@@ -175,6 +184,7 @@ class CreateEvent(BaseModel):
     scheduled_time: str | None = None
     deadline_date: str | None = None
     deadline_time: str | None = None
+    completed_date: str | None = None
     timezone: str = "Asia/Shanghai"
     mode: str | None = None
     location: str | None = Field(default=None, max_length=300)
@@ -186,6 +196,7 @@ class CreateEvent(BaseModel):
     _st = field_validator("scheduled_time")(classmethod(lambda _cls, v: _check_time(v, "scheduled_time")))
     _dd = field_validator("deadline_date")(classmethod(lambda _cls, v: _check_date(v, "deadline_date")))
     _dt = field_validator("deadline_time")(classmethod(lambda _cls, v: _check_time(v, "deadline_time")))
+    _cd = field_validator("completed_date")(classmethod(lambda _cls, v: _check_completed_date(v)))
 
     @field_validator("stage")
     @classmethod
@@ -204,6 +215,14 @@ class CreateEvent(BaseModel):
             raise validation_error("scheduled_time requires scheduled_date.")
         if self.deadline_time and not self.deadline_date:
             raise validation_error("deadline_time requires deadline_date.")
+        if self.completed_date and self.stage not in (
+            "assessment",
+            "interview_1",
+            "interview_2",
+            "interview_3",
+            "interview_hr",
+        ):
+            raise validation_error("completed_date is only valid for assessment or interview stages.")
         if self.stage == "applied" and self.source != "user_confirmation":
             raise validation_error("Applied events require explicit user_confirmation.")
         if self.source not in EVENT_SOURCES:
@@ -220,6 +239,7 @@ class PatchEvent(BaseModel):
     scheduled_time: str | None = None
     deadline_date: str | None = None
     deadline_time: str | None = None
+    completed_date: str | None = None
     timezone: str | None = None
     mode: str | None = None
     location: str | None = Field(default=None, max_length=300)
@@ -230,6 +250,7 @@ class PatchEvent(BaseModel):
     _st = field_validator("scheduled_time")(classmethod(lambda _cls, v: _check_time(v, "scheduled_time")))
     _dd = field_validator("deadline_date")(classmethod(lambda _cls, v: _check_date(v, "deadline_date")))
     _dt = field_validator("deadline_time")(classmethod(lambda _cls, v: _check_time(v, "deadline_time")))
+    _cd = field_validator("completed_date")(classmethod(lambda _cls, v: _check_completed_date(v)))
 
 
 class AgentFillCompleted(BaseModel):

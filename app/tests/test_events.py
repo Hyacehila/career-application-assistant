@@ -106,6 +106,90 @@ def test_patch_event_keeps_id_and_updates_timestamp(client):
     assert body["updated_at"] != event["updated_at"]
 
 
+def test_completion_date_can_be_created_serialized_changed_and_cleared(client):
+    created = _create(client)
+    response = client.post(
+        f"/api/applications/{created['id']}/events",
+        json={
+            "stage": "assessment",
+            "event_date": "2026-08-10",
+            "scheduled_date": "2026-08-20",
+            "completed_date": "2026-08-21",
+        },
+    )
+    assert response.status_code == 201
+    event = response.json()["event"]
+    assert event["completed_date"] == "2026-08-21"
+
+    listing = client.get("/api/applications", params={"page_size": 100}).json()
+    listed = next(item for item in listing["items"] if item["id"] == created["id"])
+    assert listed["latest_event"]["completed_date"] == "2026-08-21"
+
+    changed = client.patch(
+        f"/api/applications/{created['id']}/events/{event['id']}",
+        json={"completed_date": "2026-08-22"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["completed_date"] == "2026-08-22"
+
+    cleared = client.patch(
+        f"/api/applications/{created['id']}/events/{event['id']}",
+        json={"completed_date": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["completed_date"] is None
+    detail = client.get(f"/api/applications/{created['id']}").json()
+    assert detail["events"][0]["completed_date"] is None
+
+
+def test_completion_date_is_limited_to_assessment_and_exact_interviews(client):
+    created = _create(client)
+    invalid = client.post(
+        f"/api/applications/{created['id']}/events",
+        json={
+            "stage": "applied",
+            "event_date": "2026-08-10",
+            "source": "user_confirmation",
+            "completed_date": "2026-08-10",
+        },
+    )
+    assert invalid.status_code == 422
+
+    interview = client.post(
+        f"/api/applications/{created['id']}/events",
+        json={
+            "stage": "interview_hr",
+            "event_date": "2026-08-12",
+            "scheduled_date": "2026-08-20",
+        },
+    ).json()["event"]
+    completed = client.patch(
+        f"/api/applications/{created['id']}/events/{interview['id']}",
+        json={"completed_date": "2026-08-20"},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["completed_date"] == "2026-08-20"
+
+
+def test_completion_date_rejects_invalid_or_future_dates(client):
+    created = _create(client)
+    event = client.post(
+        f"/api/applications/{created['id']}/events",
+        json={
+            "stage": "assessment",
+            "event_date": "2026-08-10",
+            "deadline_date": "2026-08-20",
+        },
+    ).json()["event"]
+    for invalid in ("2026-02-30", "2999-01-01"):
+        response = client.patch(
+            f"/api/applications/{created['id']}/events/{event['id']}",
+            json={"completed_date": invalid},
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "validation_error"
+
+
 def test_patch_applied_event_resyncs_submitted_at(client):
     created = _create(client)
     client.post(

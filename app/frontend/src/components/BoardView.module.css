@@ -1,19 +1,19 @@
 .boardContainer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
 }
 
 .stageTrack {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 280px);
-  grid-column-gap: 16px;
+  grid-template-columns: repeat(5, 276px);
+  grid-column-gap: 18px;
   align-items: center;
   width: max-content;
-  height: 18px;
-  margin-bottom: 4px;
+  height: 20px;
+  margin-bottom: 0;
 }
 
 .stageTrackLine {
@@ -27,8 +27,8 @@
 
 .stageTrackNode {
   justify-self: center;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background-color: var(--color-flow-accent);
   box-shadow: 0 0 0 3px var(--color-workspace-bg);
@@ -51,28 +51,28 @@
   width: 100%;
   min-width: 0;
   overflow-x: auto;
-  padding: 4px 0 20px;
+  padding: 2px 0 18px;
   scrollbar-gutter: stable;
 }
 
 .board {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 18px;
   align-items: flex-start;
   min-width: min-content;
 }
 
 .column {
-  width: 280px;
-  flex: 0 0 280px;
+  width: 276px;
+  flex: 0 0 276px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-height: 160px;
   border: var(--border-width) solid transparent;
   border-radius: var(--radius-card);
-  padding: 4px;
+  padding: 3px;
   transition: border-color 140ms ease, background-color 140ms ease;
 }
 
@@ -86,7 +86,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 6px 7px 8px;
   color: var(--color-text-primary);
 }
 
@@ -94,7 +94,7 @@
   font-family: var(--font-family);
   font-size: var(--body-font-size);
   line-height: var(--body-line-height);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .columnCount {
@@ -102,15 +102,16 @@
   font-size: var(--aux-font-size);
   line-height: var(--aux-line-height);
   color: var(--color-text-secondary);
-  background-color: var(--color-workspace-bg);
-  border-radius: 8px;
-  padding: 1px 8px;
+  background-color: #E9EEF5;
+  border-radius: 999px;
+  padding: 1px 7px;
 }
 
 .columnCards {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  min-height: 72px;
 }
 
 .columnEmpty {
@@ -128,7 +129,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
+  height: 38px;
+  border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-control);
   color: var(--color-text-secondary);
   font-family: var(--font-family);
@@ -137,42 +139,48 @@
 }
 
 .columnAdd:hover {
-  background-color: var(--color-workspace-bg);
+  background-color: rgba(23, 104, 232, 0.04);
+  border-color: var(--color-brand);
   color: var(--color-brand);
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-height: 44px;
+  gap: 10px;
+  min-height: 100px;
   box-sizing: border-box;
   background-color: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 10px 12px;
+  padding: 13px 14px 12px;
   cursor: grab;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
 .card:hover {
-  border-color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
 }
 
 .card:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
+  outline: 1px dashed var(--color-brand);
+  outline-offset: 3px;
 }
 
 .cardSelected {
   border-color: var(--color-brand);
-  background-color: rgba(23, 104, 232, 0.04);
+  background-color: #F7FAFF;
+  box-shadow: inset 3px 0 0 var(--color-brand);
 }
 
 .cardDragging {
   cursor: grabbing;
   box-shadow: 0 4px 12px rgba(17, 27, 52, 0.14);
   border-color: var(--color-brand);
+  opacity: .92;
+  transform: none;
 }
 
 .cardTop {
@@ -206,7 +214,27 @@
   font-size: var(--job-font-size);
   line-height: var(--job-line-height);
   font-weight: var(--job-font-weight);
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
+}
+
+.cardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cardStatusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -225,6 +253,11 @@
   scroll-snap-type: x proximity;
   padding: 4px 20px;
   margin: -20px -20px 0;
+  scrollbar-width: none;
+}
+
+.stageChips::-webkit-scrollbar {
+  display: none;
 }
 
 .stageChip {
@@ -236,7 +269,7 @@
   min-height: 44px;
   padding: 0 14px;
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: 999px;
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   white-space: nowrap;
@@ -272,7 +305,7 @@
 
 .stageChipActive .stageChipCount {
   color: var(--color-brand);
-  background-color: rgba(23, 104, 232, 0.12);
+  background-color: rgba(23, 104, 232, 0.1);
 }
 
 .mobileColumn {
@@ -288,12 +321,12 @@
   }
 
   .stageChips {
-    margin: -20px 0 0;
-    padding: 4px 12px;
+    margin: -16px 0 0;
+    padding: 12px 16px 8px;
   }
 
   .mobileColumn {
-    padding: 12px 12px 0;
+    padding: 8px 16px 0;
   }
 
   .mobileColumn .columnAdd {
@@ -301,7 +334,7 @@
   }
 
   .mobileColumn .card {
-    min-height: 44px;
+    min-height: 96px;
   }
 }
 

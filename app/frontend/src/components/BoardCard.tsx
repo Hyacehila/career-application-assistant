@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import type { ApplicationRecord } from '../api/client'
 import { cn } from '../lib/classNames'
 import { boardGroupOf } from '../lib/statuses'
+import { stagePresentationOf } from '../lib/stagePresentation'
 import styles from './BoardView.module.css'
 
 export interface BoardCardProps {
@@ -27,8 +28,9 @@ export default function BoardCard({
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 5 }
     : undefined
-  const cardLabel = `${record.company_name} ${record.job_title}`
-  const cardTitle = `${record.company_name} · ${record.job_title}`
+  const presentation = stagePresentationOf(record)
+  const cardLabel = `${record.company_name} ${record.job_title} ${presentation.text}`
+  const cardTitle = `${record.company_name} · ${record.job_title} · ${presentation.text}`
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter') {
@@ -60,6 +62,14 @@ export default function BoardCard({
         <span className={styles.company}>{record.company_name}</span>
         <span className={styles.job}>{record.job_title}</span>
       </div>
+      <span className={styles.cardStatus} data-testid={`board-card-status-${record.id}`}>
+        <span
+          className={styles.cardStatusDot}
+          style={{ backgroundColor: presentation.color }}
+          aria-hidden="true"
+        />
+        <span>{presentation.text}</span>
+      </span>
     </article>
   )
 }

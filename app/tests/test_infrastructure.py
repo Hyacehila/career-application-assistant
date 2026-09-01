@@ -47,7 +47,7 @@ def test_migrations_are_idempotent(private_root: Path) -> None:
     init_database(paths)
 
 
-def test_v3_migration_backfills_opaque_credential_generation(private_root: Path) -> None:
+def test_v3_and_v4_migrations_preserve_data_and_add_completion_date(private_root: Path) -> None:
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     connection = open_connection(paths)
     try:
@@ -79,16 +79,37 @@ def test_v3_migration_backfills_opaque_credential_generation(private_root: Path)
             )
             """
         )
+        connection.execute(
+            """
+            INSERT INTO applications (
+                id, company_name, job_title, current_status, created_at, updated_at
+            ) VALUES (1, '迁移测试公司', '迁移测试岗位', 'assessment', 'fixture', 'fixture')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO application_events (
+                id, application_id, stage, event_date, source, created_at, updated_at
+            ) VALUES (1, 1, 'assessment', '2026-08-20', 'manual_ui', 'fixture', 'fixture')
+            """
+        )
         connection.commit()
 
-        assert ensure_migrations(connection) == 3
-        assert ensure_migrations(connection) == 3
+        assert ensure_migrations(connection) == 4
+        assert ensure_migrations(connection) == 4
         row = connection.execute(
             "SELECT * FROM mail_accounts WHERE id = 'legacy-account'"
         ).fetchone()
         columns = {
             item["name"] for item in connection.execute("PRAGMA table_info(mail_accounts)")
         }
+        event_columns = {
+            item["name"]
+            for item in connection.execute("PRAGMA table_info(application_events)")
+        }
+        event_row = connection.execute(
+            "SELECT stage, event_date, completed_date FROM application_events WHERE id = 1"
+        ).fetchone()
     finally:
         connection.close()
 
@@ -102,6 +123,12 @@ def test_v3_migration_backfills_opaque_credential_generation(private_root: Path)
     assert row["credential_ref"] == "legacy-account"
     assert row["pending_credential_ref"] is None
     assert row["previous_credential_ref"] is None
+    assert "completed_date" in event_columns
+    assert dict(event_row) == {
+        "stage": "assessment",
+        "event_date": "2026-08-20",
+        "completed_date": None,
+    }
 
 
 def test_failed_migration_rolls_back_and_can_be_retried(
@@ -147,7 +174,7 @@ def test_failed_migration_rolls_back_and_can_be_retried(
         assert version == 2
 
         monkeypatch.setitem(MIGRATIONS, 3, original)
-        assert ensure_migrations(connection) == 3
+        assert ensure_migrations(connection) == 4
     finally:
         connection.close()
 
@@ -157,7 +184,7 @@ def test_unknown_schema_version_stops_startup(private_root: Path) -> None:
     init_database(paths)
 
     connection = open_connection(paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (4, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (5, 'x')")
     connection.commit()
     connection.close()
 
@@ -171,7 +198,7 @@ def test_health_reports_ok_schema_version(client) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["database"] == "available"
-    assert body["schema_version"] == 3
+    assert body["schema_version"] == 4
     assert body["service"] == "career-application-assistant"
     assert body["mode"] == "test"
     assert body["synthetic_data"] is False
@@ -199,7 +226,7 @@ def test_health_returns_503_when_database_is_unavailable(client, private_root: P
 
 def test_health_returns_503_for_incompatible_schema(client) -> None:
     connection = open_connection(client.app.state.paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (4, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (5, 'x')")
     connection.commit()
     connection.close()
     response = client.get("/api/health")

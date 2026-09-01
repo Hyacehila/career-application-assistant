@@ -3,11 +3,12 @@
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
   overflow-x: auto;
+  box-shadow: 0 1px 2px rgba(17, 27, 52, 0.03);
 }
 
 .table {
   width: 100%;
-  min-width: 920px;
+  min-width: 1180px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -19,8 +20,9 @@
   font-weight: 600;
   color: var(--color-text-secondary);
   text-align: left;
-  padding: 10px 12px;
-  background-color: var(--color-workspace-bg);
+  height: 44px;
+  padding: 10px 14px;
+  background-color: #F8FAFC;
   border-bottom: var(--border-width) solid var(--color-border);
   white-space: nowrap;
 }
@@ -34,7 +36,8 @@
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 10px 12px;
+  min-height: 44px;
+  padding: 10px 14px;
   color: var(--color-text-secondary);
   font-family: var(--font-family);
   font-size: var(--control-label-font-size);
@@ -57,7 +60,7 @@
 }
 
 .row:hover {
-  background-color: var(--color-workspace-bg);
+  background-color: var(--color-surface-hover);
 }
 
 .rowSelected {
@@ -66,12 +69,18 @@
 }
 
 .rowCell {
-  padding: 10px 12px;
+  height: 56px;
+  padding: 12px 14px;
+  border-bottom: var(--border-width) solid var(--color-workspace-bg);
   font-family: var(--font-family);
   font-size: var(--body-font-size);
   line-height: var(--body-line-height);
   color: var(--color-text-primary);
   white-space: nowrap;
+}
+
+.row:last-child .rowCell {
+  border-bottom: 0;
 }
 
 .rowCellCompany {
@@ -88,13 +97,15 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: var(--color-text-primary);
+  font-size: var(--control-label-font-size);
 }
 
 .statusDot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  flex: 0 0 8px;
+  flex: 0 0 6px;
 }
 
 .muted {
@@ -106,7 +117,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-top: var(--border-width) solid var(--color-border);
   background-color: var(--color-surface);
   border-radius: 0 0 var(--radius-card) var(--radius-card);
@@ -169,13 +180,14 @@
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
   overflow: hidden;
+  margin: 0 16px;
 }
 
 .mobileRow {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 13px 14px;
   border-bottom: var(--border-width) solid var(--color-workspace-bg);
   cursor: pointer;
   transition: background-color 140ms ease;
@@ -232,7 +244,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 5px 14px;
 }
 
 .mobileRowMeta {
@@ -244,7 +256,12 @@
 
 @media (max-width: 767px) {
   .mobileRow {
-    min-height: 44px;
+    min-height: 78px;
+  }
+
+  .pagination {
+    margin-top: 12px;
+    padding-inline: 16px;
   }
 
   .paginationButton {

@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px 18px;
 }
 
 .field {
@@ -20,9 +20,9 @@
 }
 
 .select {
-  height: 32px;
-  min-width: 96px;
-  padding: 0 8px;
+  height: 34px;
+  min-width: 104px;
+  padding: 0 10px;
   padding-right: 26px;
   background-color: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
@@ -37,7 +37,7 @@
 }
 
 .select:hover {
-  border-color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
 }
 
 @media (max-width: 767px) {

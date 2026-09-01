@@ -91,7 +91,7 @@ def test_demo_health_seed_and_route_surface(demo_client: TestClient) -> None:
     assert health.json() == {
         "status": "ok",
         "database": "available",
-        "schema_version": 3,
+        "schema_version": 4,
         "service": "career-application-assistant",
         "mode": "demo",
         "synthetic_data": True,

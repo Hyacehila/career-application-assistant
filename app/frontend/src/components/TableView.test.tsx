@@ -111,10 +111,10 @@ describe('TableView', () => {
     expect(onOpen).toHaveBeenCalledWith(1)
   })
 
-  it('当前阶段显示语义色状态点与标签，投递日期缺省显示 —', () => {
+  it('当前阶段显示共享状态文案与语义日期，投递日期缺省显示 —', () => {
     render(<TableView {...baseProps()} />)
-    expect(screen.getByTestId('table-row-1')).toHaveTextContent('待确认投递')
-    expect(screen.getByTestId('table-row-2')).toHaveTextContent('已投递')
+    expect(screen.getByTestId('table-row-1')).toHaveTextContent('创建于 2026-08-20')
+    expect(screen.getByTestId('table-row-2')).toHaveTextContent('投递于 2026-08-10')
     expect(screen.getByTestId('table-row-2')).toHaveTextContent('2026-08-10')
     expect(screen.getByTestId('table-row-1')).toHaveTextContent('—')
   })

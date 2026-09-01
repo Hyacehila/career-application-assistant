@@ -3,14 +3,16 @@ import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import X from "lucide-react/dist/esm/icons/x";
+import CircleCheck from "lucide-react/dist/esm/icons/circle-check";
 import { deleteApplication, type ApplicationRecord, type ApplicationEvent } from "../api/client";
 import { useApplicationDetail } from "../hooks/useApplicationDetail";
 import { useReducedMotion } from "../lib/useReducedMotion";
 import { useIsMobile } from "../lib/useIsMobile";
 import { cn } from "../lib/classNames";
 import { formatDate } from "../lib/dates";
-import { semanticColorOf, statusLabelOf } from "../lib/statuses";
+import { stagePresentationOf, supportsCompletion } from "../lib/stagePresentation";
 import ErrorState from "./ErrorState";
+import CompletionFormDialog from "./CompletionFormDialog";
 import Timeline from "./Timeline";
 import styles from "./DetailDrawer.module.css";
 
@@ -21,6 +23,7 @@ export interface DetailDrawerProps {
   onUpdateStatus: (record: ApplicationRecord) => void;
   onEdit: (record: ApplicationRecord) => void;
   onDeleted: (id: number) => void;
+  onUpdated?: (message: string) => void;
   onError: (message: string) => void;
 }
 
@@ -56,6 +59,7 @@ export default function DetailDrawer({
   onUpdateStatus,
   onEdit,
   onDeleted,
+  onUpdated,
   onError,
 }: DetailDrawerProps) {
   const reduced = useReducedMotion();
@@ -65,6 +69,7 @@ export default function DetailDrawer({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const [completionOpen, setCompletionOpen] = useState(false);
   const bodyRef = useRef<HTMLElement | null>(null);
   const detail = useApplicationDetail(recordId);
 
@@ -83,6 +88,7 @@ export default function DetailDrawer({
       setConfirmDelete(false);
       setDeleting(false);
       setTimelineExpanded(false);
+      setCompletionOpen(false);
       return undefined;
     }
     bodyRef.current?.focus();
@@ -125,9 +131,25 @@ export default function DetailDrawer({
   };
 
   const events: ApplicationEvent[] = detail.data?.events ?? [];
-  const currentEvent = events.length > 0 && events[0].stage === record.current_status ? events[0] : null;
-  const accent = semanticColorOf(record.current_status);
-  const stageDate = currentEvent ? formatDate(currentEvent.event_date) : "";
+  const effectiveRecord = detail.data?.application ?? record;
+  const currentEvent = events.length > 0 && events[0].stage === effectiveRecord.current_status ? events[0] : null;
+  const presentation = stagePresentationOf({
+    ...effectiveRecord,
+    latest_event: currentEvent ? {
+      stage: currentEvent.stage,
+      event_date: currentEvent.event_date,
+      completed_date: currentEvent.completed_date,
+      scheduled_date: currentEvent.scheduled_date,
+      scheduled_time: currentEvent.scheduled_time,
+      deadline_date: currentEvent.deadline_date,
+      deadline_time: currentEvent.deadline_time,
+      mode: currentEvent.mode,
+      location: currentEvent.location,
+      note: currentEvent.note,
+      source: currentEvent.source,
+    } : effectiveRecord.latest_event,
+  });
+  const canComplete = Boolean(currentEvent && supportsCompletion(effectiveRecord.current_status));
   const drawerStyle = reduced ? ({ transition: "none" } as const) : undefined;
   const visibleEvents =
     isMobile && !timelineExpanded && events.length > MOBILE_TIMELINE_LIMIT
@@ -182,13 +204,13 @@ export default function DetailDrawer({
             <h3 className={styles.sectionLabel}>当前进度</h3>
             <div className={styles.progressPanel}>
               <div className={styles.progressHead}>
-                <span className={styles.progressStatus} style={{ color: accent }} data-testid="drawer-current-status">
-                  <span className={styles.progressDot} style={{ backgroundColor: accent }} aria-hidden="true" />
-                  {statusLabelOf(record.current_status)}
+                <span className={styles.progressStatus} style={{ color: presentation.color }} data-testid="drawer-current-status">
+                  <span className={styles.progressDot} style={{ backgroundColor: presentation.color }} aria-hidden="true" />
+                  {presentation.text}
                 </span>
-                {stageDate && (
+                {presentation.date && (
                   <span className={styles.progressDate} data-testid="drawer-stage-date">
-                    {stageDate}
+                    {presentation.date}
                   </span>
                 )}
               </div>
@@ -253,7 +275,22 @@ export default function DetailDrawer({
             </div>
           ) : null}
           <div className={styles.drawerActions}>
-            <button type="button" className="flowButton" onClick={() => onUpdateStatus(record)}>
+            {canComplete && currentEvent && (
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => setCompletionOpen(true)}
+                data-testid="drawer-completion-button"
+              >
+                <CircleCheck size={16} aria-hidden="true" />
+                {currentEvent.completed_date
+                  ? '修改完成状态'
+                  : effectiveRecord.current_status === 'assessment'
+                    ? '标记笔试 / 测评已完成'
+                    : '标记本轮已结束'}
+              </button>
+            )}
+            <button type="button" className="primaryButton" onClick={() => onUpdateStatus(record)}>
               更新状态
             </button>
             {isMobile ? (
@@ -283,6 +320,19 @@ export default function DetailDrawer({
           </div>
         </div>
       </aside>
+      {completionOpen && currentEvent && (
+        <CompletionFormDialog
+          record={effectiveRecord}
+          event={currentEvent}
+          onDone={(message) => {
+            setCompletionOpen(false);
+            detail.refetch();
+            onUpdated?.(message);
+          }}
+          onError={onError}
+          onClose={() => setCompletionOpen(false)}
+        />
+      )}
     </div>
   );
 }

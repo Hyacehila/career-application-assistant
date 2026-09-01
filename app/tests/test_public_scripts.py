@@ -133,7 +133,7 @@ def _synthetic_health_server(*, demo_identity: bool):
             body = {
                 "status": "ok",
                 "database": "available",
-                "schema_version": 3,
+                "schema_version": 4,
                 "service": (
                     "career-application-assistant" if demo_identity else "unknown-service"
                 ),

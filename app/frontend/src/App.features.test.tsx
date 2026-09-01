@@ -203,7 +203,7 @@ describe('App 核心交互', () => {
     const card = await screen.findByTestId('board-card-1')
     await user.click(card)
     const status = await screen.findByTestId('drawer-current-status')
-    expect(status).toHaveTextContent('待确认投递')
+    expect(status).toHaveTextContent('创建于 2026-08-20')
     await act(async () => {
       fireEvent.keyDown(document, { key: 'Escape' })
       await new Promise((resolve) => setTimeout(resolve, 240))

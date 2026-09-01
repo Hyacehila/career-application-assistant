@@ -8,7 +8,7 @@ import type { ApplicationRecord } from "../api/client";
 import type { BoardQueryError } from "../hooks/useBoardQuery";
 import { cn } from "../lib/classNames";
 import { formatDate } from "../lib/dates";
-import { semanticColorOf, statusLabelOf } from "../lib/statuses";
+import { stagePresentationOf } from "../lib/stagePresentation";
 import { useIsMobile } from "../lib/useIsMobile";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
@@ -40,27 +40,19 @@ const SORTABLE_COLUMNS: Array<{ key: string; label: string; field: string }> = [
 const FIXED_COLUMNS: string[] = ["类型", "地点", "当前阶段", "阶段日期", "投递日期", "来源"];
 
 function stageDateOf(record: ApplicationRecord): string {
-  const latestDate = record.latest_event?.event_date ? formatDate(record.latest_event.event_date) : "";
-  if (latestDate) return latestDate;
-  if (record.current_status === "applied") {
-    const submitted = formatDate(record.submitted_at);
-    if (submitted) return submitted;
-  }
-  const updated = formatDate(record.updated_at);
-  if (updated) return updated;
-  const filled = formatDate(record.filled_at);
-  return filled;
+  return stagePresentationOf(record).date;
 }
 
 function statusCell(record: ApplicationRecord) {
+  const presentation = stagePresentationOf(record);
   return (
     <span className={styles.statusCell}>
       <span
         className={styles.statusDot}
-        style={{ backgroundColor: semanticColorOf(record.current_status) }}
+        style={{ backgroundColor: presentation.color }}
         aria-hidden="true"
       />
-      {statusLabelOf(record.current_status)}
+      {presentation.text}
     </span>
   );
 }
@@ -101,10 +93,10 @@ function MobileTableRows({
             <span className={styles.statusCell}>
               <span
                 className={styles.statusDot}
-                style={{ backgroundColor: semanticColorOf(record.current_status) }}
+                style={{ backgroundColor: stagePresentationOf(record).color }}
                 aria-hidden="true"
               />
-              {statusLabelOf(record.current_status)}
+              {stagePresentationOf(record).text}
             </span>
             <span className={cn(styles.mobileRowMeta, styles.muted)}>{stageDateOf(record) || "—"}</span>
             <span className={cn(styles.mobileRowMeta, styles.muted)}>

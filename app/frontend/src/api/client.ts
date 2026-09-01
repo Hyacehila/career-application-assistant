@@ -27,6 +27,7 @@ export interface ApplicationRecord {
 export interface LatestEventSummary {
   stage: string
   event_date: string
+  completed_date: string | null
   scheduled_date: string | null
   scheduled_time: string | null
   deadline_date: string | null
@@ -69,6 +70,7 @@ export interface ApplicationEvent {
   id: number
   stage: string
   event_date: string
+  completed_date: string | null
   scheduled_date: string | null
   scheduled_time: string | null
   deadline_date: string | null
@@ -85,6 +87,7 @@ export interface ApplicationEvent {
 export interface EventPayload {
   stage: string
   event_date: string
+  completed_date?: string | null
   scheduled_date?: string | null
   scheduled_time?: string | null
   deadline_date?: string | null

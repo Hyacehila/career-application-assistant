@@ -184,9 +184,9 @@ def insert_event(connection: sqlite3.Connection, application_id: int, event: Cre
         """
         INSERT INTO application_events (
             application_id, stage, event_date, scheduled_date, scheduled_time,
-            deadline_date, deadline_time, timezone, mode, location, note, source,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            deadline_date, deadline_time, completed_date, timezone, mode, location,
+            note, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             application_id,
@@ -196,6 +196,7 @@ def insert_event(connection: sqlite3.Connection, application_id: int, event: Cre
             event.scheduled_time,
             event.deadline_date,
             event.deadline_time,
+            event.completed_date,
             event.timezone or "Asia/Shanghai",
             event.mode,
             event.location,
@@ -276,6 +277,7 @@ def patch_event(
             "scheduled_time",
             "deadline_date",
             "deadline_time",
+            "completed_date",
             "timezone",
             "mode",
             "location",
@@ -401,6 +403,7 @@ def list_applications(
                le.scheduled_time AS le_scheduled_time,
                le.deadline_date AS le_deadline_date,
                le.deadline_time AS le_deadline_time,
+               le.completed_date AS le_completed_date,
                le.mode AS le_mode,
                le.location AS le_location,
                le.note AS le_note,
@@ -426,6 +429,7 @@ def list_applications(
         "le_scheduled_time",
         "le_deadline_date",
         "le_deadline_time",
+        "le_completed_date",
         "le_mode",
         "le_location",
         "le_note",
@@ -442,6 +446,7 @@ def list_applications(
                 "scheduled_time": record.pop("le_scheduled_time"),
                 "deadline_date": record.pop("le_deadline_date"),
                 "deadline_time": record.pop("le_deadline_time"),
+                "completed_date": record.pop("le_completed_date"),
                 "mode": record.pop("le_mode"),
                 "location": record.pop("le_location"),
                 "note": record.pop("le_note"),

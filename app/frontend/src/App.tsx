@@ -228,6 +228,7 @@ export default function App() {
           boardQuery.refetch()
           showToast('记录已删除', 'success')
         }}
+        onUpdated={afterWriteSuccess}
         onError={handleError}
       />
       {recordFormOpen && (

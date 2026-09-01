@@ -19,7 +19,7 @@ function Test-DemoHealth {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            [int] $health.schema_version -eq 3 -and
+            [int] $health.schema_version -eq 4 -and
             $health.service -eq 'career-application-assistant' -and
             $health.mode -eq 'demo' -and
             $health.synthetic_data -eq $true -and

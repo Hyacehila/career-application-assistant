@@ -2,11 +2,13 @@
   color-scheme: light;
 
   --color-page-bg: #FFFFFF;
-  --color-workspace-bg: #F7F9FC;
+  --color-workspace-bg: #F5F7FA;
   --color-surface: #FFFFFF;
   --color-text-primary: #111B34;
   --color-text-secondary: #68758A;
-  --color-border: #E1E7EF;
+  --color-border: #E2E7EF;
+  --color-border-strong: #CCD5E2;
+  --color-surface-hover: #FAFBFD;
   --color-brand: #1768E8;
   --color-brand-hover: #1259C6;
   --color-flow-accent: #0F9B96;
@@ -50,7 +52,8 @@
   --radius-card: 10px;
   --radius-overlay: 12px;
   --border-width: 1px;
-  --shadow-overlay: 0 8px 24px rgba(17, 27, 52, 0.08);
+  --shadow-card-hover: 0 8px 22px rgba(17, 27, 52, 0.08);
+  --shadow-overlay: 0 18px 48px rgba(17, 27, 52, 0.16);
 }
 
 * {
@@ -71,6 +74,7 @@ body {
   line-height: var(--body-line-height);
   font-weight: var(--body-font-weight);
   -webkit-font-smoothing: antialiased;
+  min-width: 320px;
 }
 
 h1,
@@ -357,7 +361,9 @@ a:hover {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background-color: rgba(17, 27, 52, 0.32);
+  background-color: rgba(17, 27, 52, 0.38);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
   animation: overlayFadeIn 210ms ease-out;
 }
 
@@ -374,8 +380,12 @@ a:hover {
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-overlay);
   box-shadow: var(--shadow-overlay);
-  padding: 20px;
+  padding: 0;
   animation: overlayCardIn 210ms ease-out;
+}
+
+.overlayCardCompact {
+  max-width: 440px;
 }
 
 .overlayCardEnd {
@@ -387,7 +397,9 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+  padding: 20px 22px 16px;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .overlayCardTitle {
@@ -426,7 +438,8 @@ a:hover {
 .formStack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  padding: 20px 22px 22px;
 }
 
 .formRow {
@@ -458,8 +471,8 @@ a:hover {
 }
 
 .formInput {
-  height: 36px;
-  padding: 0 10px;
+  height: 40px;
+  padding: 0 12px;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-control);
   background-color: var(--color-surface);
@@ -474,7 +487,7 @@ a:hover {
 }
 
 .formInput:hover {
-  border-color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
 }
 
 .formInput:disabled {
@@ -528,7 +541,8 @@ a:hover {
   padding: 10px 12px;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-control);
-  background-color: var(--color-workspace-bg);
+  background-color: #F7FAFF;
+  border-color: #D9E7FC;
   font-family: var(--font-family);
   font-size: var(--body-font-size);
   line-height: var(--body-line-height);
@@ -578,7 +592,17 @@ a:hover {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 8px;
+}
+
+.dialogActionsSplit {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialogActionsGroup {
+  display: flex;
+  gap: 8px;
 }
 
 .primaryButton {
@@ -649,7 +673,8 @@ a:hover {
 }
 
 .secondaryButton:hover {
-  border-color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
+  background-color: var(--color-surface-hover);
 }
 
 .secondaryButton:disabled {

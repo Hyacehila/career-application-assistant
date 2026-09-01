@@ -92,10 +92,31 @@ describe('DetailDrawer', () => {
     expect(screen.getByText('记录 #42')).toBeInTheDocument()
   })
 
+  it('当前为精确面试轮次时，从详情打开独立完成弹窗', async () => {
+    stubFetch()
+    const user = userEvent.setup()
+    render(
+      <DetailDrawer
+        recordId={42}
+        record={record}
+        onClose={() => {}}
+        onUpdateStatus={() => {}}
+        onEdit={() => {}}
+        onDeleted={() => {}}
+        onError={() => {}}
+      />,
+    )
+    const completionButton = await screen.findByTestId('drawer-completion-button')
+    expect(completionButton).toHaveTextContent('标记本轮已结束')
+    await user.click(completionButton)
+    expect(screen.getByRole('dialog', { name: '标记1面已结束' })).toBeInTheDocument()
+    expect(screen.getByText(/完成状态不会自动推进到下一阶段/)).toBeInTheDocument()
+  })
+
   it.each([
-    { status: 'applied', label: '已投递', source: 'user_confirmation' },
-    { status: 'offer', label: 'Offer', source: 'manual_ui' },
-  ] as const)('$label 记录保留历史 pending_review 节点，并统一显示为待确认投递', async ({ status, label, source }) => {
+    { status: 'applied', label: '投递于 2026-08-17', timelineLabel: '已投递', source: 'user_confirmation' },
+    { status: 'offer', label: '结束于 2026-08-17', timelineLabel: 'Offer', source: 'manual_ui' },
+  ] as const)('$label 记录保留历史 pending_review 节点，并统一显示为待确认投递', async ({ status, label, timelineLabel, source }) => {
     const progressedRecord = makeRecord({
       id: 43,
       company_name: '示例网络',
@@ -127,7 +148,7 @@ describe('DetailDrawer', () => {
     await waitFor(() => {
       expect(screen.getByTestId('drawer-current-status')).toHaveTextContent(label)
     })
-    expect(screen.getByTestId('timeline-current')).toHaveTextContent(label)
+    expect(screen.getByTestId('timeline-current')).toHaveTextContent(timelineLabel)
     expect(screen.getByText('待确认投递')).toBeInTheDocument()
     expect(screen.queryByText('待人工复核')).not.toBeInTheDocument()
     expect(screen.getByText('2026-08-30')).toBeInTheDocument()

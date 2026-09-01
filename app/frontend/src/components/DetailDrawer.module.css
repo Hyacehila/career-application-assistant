@@ -9,7 +9,8 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background-color: rgba(17, 27, 52, 0.32);
+  background-color: rgba(17, 27, 52, 0.38);
+  backdrop-filter: blur(2px);
   animation: overlayFadeIn 210ms ease-out;
   pointer-events: auto;
 }
@@ -23,10 +24,10 @@
   top: 0;
   right: 0;
   height: 100%;
-  width: max(420px, min(560px, 36vw));
+  width: min(460px, 100vw);
   background-color: var(--color-surface);
   border-left: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-overlay) 0 0 var(--radius-overlay);
+  border-radius: 16px 0 0 16px;
   box-shadow: var(--shadow-overlay);
   display: flex;
   flex-direction: column;
@@ -44,10 +45,10 @@
 .drawerBody {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .drawerHead {
@@ -55,7 +56,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 20px 20px 16px;
+  padding: 22px 24px 18px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
@@ -68,7 +69,7 @@
 
 .drawerCompany {
   font-family: var(--font-family);
-  font-size: var(--company-font-size);
+  font-size: 20px;
   line-height: var(--company-line-height);
   font-weight: var(--company-font-weight);
   color: var(--color-text-primary);
@@ -95,10 +96,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
+  padding: 14px 16px;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
-  background-color: var(--color-workspace-bg);
+  background-color: #F8FAFC;
   font-family: var(--font-family);
   font-size: var(--aux-font-size);
   line-height: var(--aux-line-height);
@@ -135,8 +136,8 @@
 .progressPanel {
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 12px;
-  background-color: var(--color-surface);
+  padding: 14px 16px;
+  background-color: #FAFCFF;
 }
 
 .progressHead {
@@ -153,12 +154,12 @@
   font-family: var(--font-family);
   font-size: var(--body-font-size);
   line-height: var(--body-line-height);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .progressDot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
 
@@ -206,7 +207,7 @@
 }
 
 .drawerFoot {
-  padding: 12px 20px;
+  padding: 14px 24px;
   border-top: var(--border-width) solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -245,31 +246,33 @@
 .drawerActions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .drawerActions .flowButton,
 .drawerActions .secondaryButton {
-  flex: 1;
+  flex: 1 1 120px;
 }
 
 .timeline {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+  padding-left: 2px;
 }
 
 .timelineItem {
+  position: relative;
   display: flex;
   gap: 10px;
-  padding: 10px 12px;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-card);
+  padding: 10px 0 16px;
+  border: 0;
+  border-radius: 0;
   background-color: var(--color-surface);
 }
 
 .timelineItemCurrent {
-  border-color: var(--color-brand);
-  background-color: rgba(23, 104, 232, 0.05);
+  background-color: transparent;
 }
 
 .timelineDot {
@@ -279,6 +282,17 @@
   border-radius: 50%;
   margin-top: 6px;
   background-color: var(--color-text-secondary);
+  z-index: 1;
+}
+
+.timelineItem:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: -2px;
+  left: 3px;
+  width: 1px;
+  background-color: var(--color-border);
 }
 
 .timelineDotCurrent {
@@ -291,7 +305,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .timelineHead {
@@ -386,6 +400,11 @@
 @media (max-width: 767px) {
   .drawerBottom .drawerFoot {
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .drawerBottom .drawerBody,
+  .drawerBottom .drawerHead {
+    padding-inline: 18px;
   }
 
   .drawerBottom .drawerActions .flowButton,

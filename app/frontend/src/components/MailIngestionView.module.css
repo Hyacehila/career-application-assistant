@@ -1,5 +1,5 @@
 .page {
-  width: min(1180px, 100%);
+  width: min(1240px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -7,17 +7,16 @@
 }
 
 .hero {
-  min-height: 118px;
+  min-height: 112px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px 28px;
+  padding: 24px 26px;
   border: var(--border-width) solid var(--color-border);
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at 88% 18%, rgba(15, 155, 150, 0.15), transparent 32%),
-    linear-gradient(135deg, #FFFFFF 0%, #F4FAFB 100%);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgba(17, 27, 52, 0.03);
 }
 
 .kicker,
@@ -66,7 +65,7 @@
 .providerGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
   align-items: start;
 }
 
@@ -80,8 +79,8 @@
 
 .providerCard {
   min-width: 0;
-  padding: 18px;
-  box-shadow: 0 1px 2px rgba(17, 27, 52, 0.03);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(17, 27, 52, 0.04);
 }
 
 .providerHeading {
@@ -97,7 +96,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 9px;
   color: #FFFFFF;
   font-weight: 700;
   font-size: 12px;
@@ -172,7 +171,7 @@
   margin-top: 18px;
   padding: 12px;
   border-radius: var(--radius-control);
-  background: var(--color-workspace-bg);
+  background: #F8FAFC;
 }
 
 .accountFacts div {
@@ -222,7 +221,7 @@
 .field input,
 .field select {
   width: 100%;
-  height: 38px;
+  height: 40px;
   padding: 0 10px;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-control);
@@ -361,7 +360,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
@@ -369,12 +368,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
+  padding: 18px;
 }
 
 .candidateCard {
   padding: 18px;
-  background: #FCFDFE;
+  background: var(--color-surface);
   content-visibility: auto;
   contain-intrinsic-size: 370px;
 }

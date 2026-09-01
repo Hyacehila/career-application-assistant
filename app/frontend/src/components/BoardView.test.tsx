@@ -91,7 +91,7 @@ describe('BoardView', () => {
     expect(screen.getAllByText('暂无记录').length).toBe(4)
   })
 
-  it('按 current_status 正确分组，并让所有阶段卡片只显示公司名和岗位名', () => {
+  it('按 current_status 正确分组，并为卡片补充共享状态第三行与可访问名称', () => {
     const records = [
       makeRecord({ id: 1, company_name: '示例科技', job_title: '前端工程师', current_status: 'pending_review' }),
       makeRecord({ id: 2, company_name: '示例网络', job_title: '后端工程师', current_status: 'applied' }),
@@ -123,8 +123,9 @@ describe('BoardView', () => {
       const card = screen.getByTestId(`board-card-${record.id}`)
       expect(card).toHaveTextContent(record.company_name)
       expect(card).toHaveTextContent(record.job_title)
-      expect(card).toHaveAttribute('aria-label', `${record.company_name} ${record.job_title}`)
-      expect(card).toHaveAttribute('title', `${record.company_name} · ${record.job_title}`)
+      expect(card).toHaveAccessibleName(new RegExp(`${record.company_name} ${record.job_title}`))
+      expect(screen.getByTestId(`board-card-status-${record.id}`)).not.toBeEmptyDOMElement()
+      expect(card.getAttribute('title')).toMatch(new RegExp(`^${record.company_name} · ${record.job_title} · `))
       expect(within(card).queryByText('公司', { exact: true })).not.toBeInTheDocument()
       expect(within(card).queryByText('岗位', { exact: true })).not.toBeInTheDocument()
       expect(card).not.toHaveTextContent('上海')
@@ -133,9 +134,9 @@ describe('BoardView', () => {
       expect(card).not.toHaveTextContent('更新')
       expect(screen.queryByTestId(`board-card-highlight-${record.id}`)).not.toBeInTheDocument()
     }
-    expect(screen.getByTestId('board-card-3')).not.toHaveTextContent('1面')
-    expect(screen.getByTestId('board-card-4')).not.toHaveTextContent('Offer')
-    expect(screen.getByTestId('board-card-5')).not.toHaveTextContent('计划')
+    expect(screen.getByTestId('board-card-3')).toHaveTextContent('1面')
+    expect(screen.getByTestId('board-card-4')).toHaveTextContent('Offer')
+    expect(screen.getByTestId('board-card-5')).toHaveTextContent('笔试 / 测评')
   })
 
   it('空数据库时整板显示 EmptyState', () => {

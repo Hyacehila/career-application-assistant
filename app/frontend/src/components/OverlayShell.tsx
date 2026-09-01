@@ -9,11 +9,12 @@ interface OverlayShellProps {
   onClose: () => void
   children: ReactNode
   labelledBy?: string
+  compact?: boolean
 }
 
 const OPEN_ANIMATION_MS = 210
 
-export default function OverlayShell({ title, onClose, children, labelledBy }: OverlayShellProps) {
+export default function OverlayShell({ title, onClose, children, labelledBy, compact = false }: OverlayShellProps) {
   const reduced = useReducedMotion()
   const [closing, setClosing] = useState(false)
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -82,7 +83,7 @@ export default function OverlayShell({ title, onClose, children, labelledBy }: O
     >
       <div
         ref={cardRef}
-        className={cn('overlayCard', closing && 'overlayCardEnd')}
+        className={cn('overlayCard', compact && 'overlayCardCompact', closing && 'overlayCardEnd')}
         role="dialog"
         aria-modal="true"
         aria-label={title}

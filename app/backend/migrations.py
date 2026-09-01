@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-SUPPORTED_SCHEMA_VERSION = 3
+SUPPORTED_SCHEMA_VERSION = 4
 
 MIGRATIONS: dict[int, str] = {
     1: """
@@ -156,6 +156,9 @@ WHERE connection_generation = '';
 
 CREATE INDEX idx_mail_accounts_credential_cleanup
     ON mail_accounts (provider, pending_credential_ref, previous_credential_ref);
+""",
+    4: """
+ALTER TABLE application_events ADD COLUMN completed_date TEXT;
 """
 }
 

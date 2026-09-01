@@ -17,7 +17,7 @@ export function okBody(body: unknown): Response {
 export const STANDARD_HEALTH = {
   status: 'ok',
   database: 'ready',
-  schema_version: 3,
+  schema_version: 4,
   service: 'career-application-assistant',
   mode: 'standard',
   synthetic_data: false,

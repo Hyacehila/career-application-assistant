@@ -28,6 +28,7 @@ export function makeEvent(overrides: Partial<ApplicationEvent> = {}): Applicatio
     id: 11,
     stage: 'pending_review',
     event_date: '2026-08-20',
+    completed_date: null,
     scheduled_date: null,
     scheduled_time: null,
     deadline_date: null,
