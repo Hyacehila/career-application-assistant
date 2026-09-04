@@ -49,7 +49,7 @@ def test_migrations_are_idempotent(private_root: Path) -> None:
     init_database(paths)
 
 
-def test_v3_through_v5_migrations_preserve_imap_data_and_add_completion_date(private_root: Path) -> None:
+def test_v3_through_v6_migrations_preserve_imap_data_and_add_completion_date(private_root: Path) -> None:
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     connection = open_connection(paths)
     try:
@@ -97,8 +97,8 @@ def test_v3_through_v5_migrations_preserve_imap_data_and_add_completion_date(pri
         )
         connection.commit()
 
-        assert ensure_migrations(connection) == 5
-        assert ensure_migrations(connection) == 5
+        assert ensure_migrations(connection) == 6
+        assert ensure_migrations(connection) == 6
         row = connection.execute(
             "SELECT * FROM mail_accounts WHERE id = 'legacy-account'"
         ).fetchone()
@@ -176,7 +176,7 @@ def test_failed_migration_rolls_back_and_can_be_retried(
         assert version == 2
 
         monkeypatch.setitem(MIGRATIONS, 3, original)
-        assert ensure_migrations(connection) == 5
+        assert ensure_migrations(connection) == 6
     finally:
         connection.close()
 
@@ -257,7 +257,7 @@ def test_v4_to_v5_removes_outlook_local_state_but_preserves_timeline_and_imap(
         )
         connection.commit()
 
-        assert ensure_migrations(connection) == 5
+        assert ensure_migrations(connection) == 6
         assert [row["provider"] for row in connection.execute("SELECT provider FROM mail_accounts")] == [
             "qq"
         ]
@@ -295,12 +295,94 @@ def test_v4_to_v5_removes_outlook_local_state_but_preserves_timeline_and_imap(
         connection.close()
 
 
+def test_v5_to_v6_releases_transient_run_and_allows_repeated_header_decisions(
+    private_root: Path,
+) -> None:
+    paths = Paths(repository_root=private_root.parent, private_root=private_root)
+    connection = open_connection(paths)
+    try:
+        connection.execute(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+        )
+        for version in range(1, 6):
+            connection.executescript(MIGRATIONS[version])
+            connection.execute(
+                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, 'fixture')",
+                (version,),
+            )
+        connection.execute(
+            """
+            UPDATE outlook_connector_state
+            SET status = 'connecting', last_success_at = '2026-09-01T00:00:00+00:00',
+                active_run_id = 'old-run', lease_expires_at = '2099-01-01T00:00:00+00:00',
+                headers_seen = 1, bodies_seen = 1
+            WHERE singleton_id = 1
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO outlook_scan_windows (
+                id, window_kind, start_at, end_at, next_from_index,
+                leased_by_run_id, lease_start_index, lease_headers_seen,
+                lease_limit, created_at, updated_at
+            ) VALUES (
+                'window-1', 'backfill', '2026-08-01T00:00:00+00:00',
+                '2026-09-01T00:00:00+00:00', 4, 'old-run', 4, 1, 100,
+                'fixture', 'fixture'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO outlook_connector_body_tokens (
+                run_id, token_hash, fingerprint, header_hash, consumed, created_at
+            ) VALUES ('old-run', 'old-token', 'same-fingerprint', 'old-header', 0, 'fixture')
+            """
+        )
+        connection.commit()
+
+        assert ensure_migrations(connection) == 6
+        state = connection.execute(
+            "SELECT * FROM outlook_connector_state WHERE singleton_id = 1"
+        ).fetchone()
+        window = connection.execute(
+            "SELECT * FROM outlook_scan_windows WHERE id = 'window-1'"
+        ).fetchone()
+        assert state["status"] == "connected"
+        assert state["active_run_id"] is None
+        assert state["lease_expires_at"] is None
+        assert state["headers_seen"] == 0
+        assert state["bodies_seen"] == 0
+        assert window["next_from_index"] == 4
+        assert window["leased_by_run_id"] is None
+        assert window["lease_start_index"] is None
+        assert window["lease_headers_seen"] == 0
+        assert window["lease_limit"] is None
+        assert connection.execute(
+            "SELECT count(*) FROM outlook_connector_body_tokens"
+        ).fetchone()[0] == 0
+
+        connection.executemany(
+            """
+            INSERT INTO outlook_connector_body_tokens (
+                run_id, token_hash, fingerprint, header_hash, consumed, created_at
+            ) VALUES ('new-run', ?, 'same-fingerprint', ?, 0, 'fixture')
+            """,
+            [("token-1", "header-1"), ("token-2", "header-2")],
+        )
+        assert connection.execute(
+            "SELECT count(*) FROM outlook_connector_body_tokens WHERE fingerprint = 'same-fingerprint'"
+        ).fetchone()[0] == 2
+    finally:
+        connection.close()
+
+
 def test_unknown_schema_version_stops_startup(private_root: Path) -> None:
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     init_database(paths)
 
     connection = open_connection(paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (6, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (7, 'x')")
     connection.commit()
     connection.close()
 
@@ -314,7 +396,7 @@ def test_health_reports_ok_schema_version(client) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["database"] == "available"
-    assert body["schema_version"] == 5
+    assert body["schema_version"] == 6
     assert body["service"] == "career-application-assistant"
     assert body["mode"] == "test"
     assert body["synthetic_data"] is False
@@ -342,7 +424,7 @@ def test_health_returns_503_when_database_is_unavailable(client, private_root: P
 
 def test_health_returns_503_for_incompatible_schema(client) -> None:
     connection = open_connection(client.app.state.paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (6, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (7, 'x')")
     connection.commit()
     connection.close()
     response = client.get("/api/health")

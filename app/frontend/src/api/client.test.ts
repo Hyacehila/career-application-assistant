@@ -21,7 +21,7 @@ describe('api client', () => {
     const healthPayload = {
       status: 'ok',
       database: 'ready',
-      schema_version: 5,
+      schema_version: 6,
       service: 'career-application-assistant',
       mode: 'demo',
       synthetic_data: true,

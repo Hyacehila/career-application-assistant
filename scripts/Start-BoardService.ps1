@@ -52,7 +52,7 @@ function Test-ServiceHealthy {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            $health.schema_version -eq 5 -and
+            $health.schema_version -eq 6 -and
             $health.service -eq 'career-application-assistant' -and
             $health.mode -eq 'standard' -and
             $health.synthetic_data -eq $false -and

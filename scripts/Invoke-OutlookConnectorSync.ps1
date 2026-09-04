@@ -46,7 +46,7 @@ function Test-BoardHealth {
         return (
             $health.status -eq 'ok' -and
             $health.database -eq 'available' -and
-            [int] $health.schema_version -eq 5 -and
+            [int] $health.schema_version -eq 6 -and
             $health.service -eq 'career-application-assistant' -and
             $modeAllowed -and
             $health.mode -ne 'demo' -and

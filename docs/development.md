@@ -39,7 +39,7 @@ Standard and demo startup steps are in [Getting started](getting-started.md). De
 {
   "status": "ok",
   "database": "available",
-  "schema_version": 5,
+  "schema_version": 6,
   "service": "career-application-assistant",
   "mode": "standard",
   "synthetic_data": false,
@@ -73,8 +73,8 @@ All endpoints are JSON under `/api`. POST and PATCH requests require `Content-Ty
 | `DELETE` | `/api/mail/accounts/{provider}` | QQ/163 only: remove cursor and secure credential state |
 | `GET` | `/api/mail/operations/{id}` | Poll a sanitized QQ/163 connect/sync operation |
 | `POST` | `/api/mail/outlook-connector/runs` | Acquire one bounded 15-minute connector lease and scan plan |
-| `POST` | `/api/mail/outlook-connector/runs/{id}/headers` | Gate one verified Inbox header page and issue body tokens |
-| `POST` | `/api/mail/outlook-connector/runs/{id}/messages` | Parse at most 20 gated bodies into structured results |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/headers` | Register one verified Inbox header page and issue an Agent decision token per header |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/messages` | Resolve up to 20 Agent header/body decisions and parse approved bodies |
 | `POST` | `/api/mail/outlook-connector/runs/{id}/complete` | Commit fully processed window progress |
 | `POST` | `/api/mail/outlook-connector/runs/{id}/fail` | Release a run with an allowlisted sanitized error code |
 | `GET` | `/api/mail/candidates` | List structured review candidates without raw mail fields |

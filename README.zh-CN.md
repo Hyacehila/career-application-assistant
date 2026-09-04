@@ -94,7 +94,7 @@ pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 - 五列看板与详细表格，支持搜索、筛选、排序、分页、响应式布局、详情、下一步事项和软删除。
 - 十个精确状态以追加式、经过校验的时间线事件表示；`applied` 始终要求用户明确确认。
 - 通过类型化 Agent 接口和 PowerShell 封装命令记录已准备的表单与后续状态，无需直接操作 SQLite。
-- 可选的只读邮件接入：Outlook 使用 Codex Outlook Email 连接器，QQ/163 使用本机 TLS IMAP，并提供结构化人工复核队列。
+- 可选的只读邮件接入：Outlook 邮件头和所选正文由 Agent 逐封判断，QQ/163 使用本机 TLS IMAP，并提供结构化人工复核队列。
 - 可编辑、可重置的合成 Demo，无法访问正式数据库、Agent 路由或邮件运行时。
 - 后端、前端、浏览器回归、发布策略和 Windows CI 检查均不需要真实招聘网站或邮箱账号。
 

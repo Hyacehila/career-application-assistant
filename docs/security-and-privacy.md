@@ -46,7 +46,7 @@ Status changes are append-only events. `applied` requires `user_confirmation`; f
 
 QQ/163 authorization codes are stored only in Windows Credential Manager under opaque account targets. Outlook authentication is managed by the Codex Outlook Email connector; the local service has no Outlook Client ID, access token, refresh token, or cache. These values are not written to SQLite, logs, configuration, or `private/`. IMAP secure-storage failures are closed failures, never plaintext fallbacks.
 
-Mail is read incrementally and read-only. Outlook connector data is passed to the fixed local wrapper over standard input; raw subject, sender, body, message ID, attachment, private contact, verification code, meeting link, and connector token fields are not returned by the API or kept in the review queue. See [Mail ingestion](mail-ingestion.md) for provider and retention details.
+Mail is read incrementally and read-only. Bounded header and body review packets enter the current Codex task so the Agent—not backend keyword rules—decides whether to fetch or process each message. Raw connector responses, message IDs, and temporary tokens remain private orchestration state; submissions reach the fixed local wrapper only over standard input. Raw subject, sender, body, message ID, attachment, private contact, verification code, meeting link, and connector token fields are not returned by the API or kept in the review queue. See [Mail ingestion](mail-ingestion.md) for provider and retention details.
 
 ## Public-release checks
 

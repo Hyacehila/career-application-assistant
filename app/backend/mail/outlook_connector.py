@@ -1,8 +1,8 @@
 """State machine for Outlook mail supplied by the Codex connector.
 
-This module never calls Outlook. It accepts bounded, transient connector data,
-applies deterministic parsing, and persists only fingerprints and structured
-review candidates.
+This module never calls Outlook or performs semantic header triage. It accepts
+bounded Agent decisions, parses only Agent-approved messages, and persists only
+fingerprints and structured review candidates.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from uuid import uuid4
 from ..clock import now_iso
 from ..errors import ApiError, validation_error
 from . import store
-from .classifier import classify_and_extract, is_likely_recruitment_header
+from .classifier import classify_and_extract
 from .parsing import MailContentError, html_to_text, trim_quoted_reply
 from .schemas import (
     MailAccountOut,
@@ -269,7 +269,7 @@ def start_run(
     )
 
 
-def gate_headers(
+def register_headers(
     connection: sqlite3.Connection,
     run_id: str,
     payload: OutlookHeaderBatchRequest,
@@ -297,8 +297,7 @@ def gate_headers(
     received_from = _as_utc(window["start_at"])
     received_before = _as_utc(window["end_at"])
     body_tokens: list[OutlookBodyTokenOut] = []
-    duplicate_count = 0
-    ignored_count = 0
+    seen_before_count = 0
     for item in payload.items:
         received_at = item.received_at.astimezone(UTC)
         if not (received_from <= received_at < received_before):
@@ -314,29 +313,31 @@ def gate_headers(
             """,
             (run_id, fingerprint),
         ).fetchone()
-        if exists is not None or issued is not None:
-            duplicate_count += 1
-        elif is_likely_recruitment_header(item.subject, item.sender):
-            body_token = secrets.token_urlsafe(32)
-            connection.execute(
-                """
-                INSERT INTO outlook_connector_body_tokens (
-                    run_id, token_hash, fingerprint, header_hash, consumed, created_at
-                ) VALUES (?, ?, ?, ?, 0, ?)
-                """,
-                (
-                    run_id,
-                    _digest(body_token),
-                    fingerprint,
-                    _header_hash(item),
-                    now_iso(),
-                ),
+        seen_before = exists is not None or issued is not None
+        if seen_before:
+            seen_before_count += 1
+        body_token = secrets.token_urlsafe(32)
+        connection.execute(
+            """
+            INSERT INTO outlook_connector_body_tokens (
+                run_id, token_hash, fingerprint, header_hash, consumed, created_at
+            ) VALUES (?, ?, ?, ?, 0, ?)
+            """,
+            (
+                run_id,
+                _digest(body_token),
+                fingerprint,
+                _header_hash(item),
+                now_iso(),
+            ),
+        )
+        body_tokens.append(
+            OutlookBodyTokenOut(
+                token=item.token,
+                body_token=body_token,
+                seen_before=seen_before,
             )
-            body_tokens.append(
-                OutlookBodyTokenOut(token=item.token, body_token=body_token)
-            )
-        else:
-            ignored_count += 1
+        )
     new_count = current_count + len(payload.items)
     connection.execute(
         "UPDATE outlook_connector_state SET headers_seen = ?, updated_at = ? WHERE singleton_id = 1",
@@ -352,8 +353,8 @@ def gate_headers(
     )
     return OutlookHeaderBatchOut(
         body_tokens=body_tokens,
-        duplicate_count=duplicate_count,
-        ignored_count=ignored_count,
+        issued_count=len(body_tokens),
+        seen_before_count=seen_before_count,
         remaining_budget=RUN_BUDGET - new_count,
     )
 
@@ -399,13 +400,28 @@ def ingest_messages(
     payload: OutlookMessageBatchRequest,
 ) -> OutlookMessageBatchOut:
     state = _require_active_run(connection, run_id)
-    current_count = int(state.get("bodies_seen") or 0)
-    if current_count + len(payload.items) > RUN_BUDGET:
+    current_body_count = int(state.get("bodies_seen") or 0)
+    resolved_count = int(
+        connection.execute(
+            """
+            SELECT count(*) FROM outlook_connector_body_tokens
+            WHERE run_id = ? AND consumed = 1
+            """,
+            (run_id,),
+        ).fetchone()[0]
+    )
+    if resolved_count + len(payload.items) > RUN_BUDGET:
+        raise validation_error("The Outlook connector run exceeded its decision budget.")
+    if resolved_count + len(payload.items) > int(state.get("headers_seen") or 0):
+        raise validation_error("The Outlook connector submitted more decisions than headers.")
+    bodies_submitted = sum(
+        item.agent_decision != "skip_header" for item in payload.items
+    )
+    if current_body_count + bodies_submitted > RUN_BUDGET:
         raise validation_error("The Outlook connector run exceeded its body budget.")
-    if current_count + len(payload.items) > int(state.get("headers_seen") or 0):
-        raise validation_error("The Outlook connector submitted more bodies than headers.")
 
-    accepted = queued = committed = duplicate = ignored = 0
+    accepted = queued = committed = duplicate = unstructured = 0
+    skipped_header = skipped_body = 0
     for item in payload.items:
         fingerprint = store.message_fingerprint("outlook", item.source_id)
         authorized = connection.execute(
@@ -425,8 +441,11 @@ def ingest_messages(
             """,
             (run_id, _digest(item.body_token)),
         )
-        if not is_likely_recruitment_header(item.subject, item.sender):
-            ignored += 1
+        if item.agent_decision == "skip_header":
+            skipped_header += 1
+            continue
+        if item.agent_decision == "skip_body":
+            skipped_body += 1
             continue
         if connection.execute(
             "SELECT 1 FROM mail_event_candidates WHERE fingerprint = ?", (fingerprint,)
@@ -462,9 +481,6 @@ def ingest_messages(
             quoted_only=bool(trimmed and trimmed.quoted_only),
             quoted_tail_trimmed=bool(trimmed and trimmed.trimmed),
         )
-        if extracted.negative_signal:
-            ignored += 1
-            continue
         candidate, _, event = store.create_candidate(
             connection,
             provider="outlook",
@@ -472,7 +488,7 @@ def ingest_messages(
             extracted=_extraction_mapping(extracted, extra_reasons),
         )
         if candidate is None:
-            ignored += 1
+            unstructured += 1
             continue
         accepted += 1
         if event is not None:
@@ -485,14 +501,16 @@ def ingest_messages(
 
     connection.execute(
         "UPDATE outlook_connector_state SET bodies_seen = ?, updated_at = ? WHERE singleton_id = 1",
-        (current_count + len(payload.items), now_iso()),
+        (current_body_count + bodies_submitted, now_iso()),
     )
     return OutlookMessageBatchOut(
         accepted_count=accepted,
         queued_count=queued,
         committed_count=committed,
         duplicate_count=duplicate,
-        ignored_count=ignored,
+        unstructured_count=unstructured,
+        skipped_header_count=skipped_header,
+        skipped_body_count=skipped_body,
     )
 
 
@@ -524,7 +542,7 @@ def complete_run(
         ).fetchone()[0]
     )
     if unconsumed:
-        raise validation_error("All gated Outlook message bodies must be resolved first.")
+        raise validation_error("Every Outlook header must have an Agent decision first.")
 
     for window_id, item in supplied.items():
         row = leased[window_id]

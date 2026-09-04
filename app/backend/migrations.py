@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-SUPPORTED_SCHEMA_VERSION = 5
+SUPPORTED_SCHEMA_VERSION = 6
 
 MIGRATIONS: dict[int, str] = {
     1: """
@@ -351,6 +351,41 @@ CREATE TABLE outlook_connector_body_tokens (
 
 CREATE INDEX idx_outlook_body_tokens_run
     ON outlook_connector_body_tokens (run_id, consumed);
+""",
+    6: """
+UPDATE outlook_scan_windows
+SET leased_by_run_id = NULL,
+    lease_start_index = NULL,
+    lease_headers_seen = 0,
+    lease_limit = NULL,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now');
+
+DROP TABLE outlook_connector_body_tokens;
+
+CREATE TABLE outlook_connector_body_tokens (
+    run_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    header_hash TEXT NOT NULL,
+    consumed INTEGER NOT NULL DEFAULT 0 CHECK (consumed IN (0, 1)),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (run_id, token_hash)
+);
+
+CREATE INDEX idx_outlook_body_tokens_run
+    ON outlook_connector_body_tokens (run_id, consumed);
+
+UPDATE outlook_connector_state
+SET status = CASE
+        WHEN status = 'paused' THEN 'paused'
+        WHEN last_success_at IS NOT NULL THEN 'connected'
+        ELSE 'disconnected'
+    END,
+    active_run_id = NULL,
+    lease_expires_at = NULL,
+    headers_seen = 0,
+    bodies_seen = 0,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now');
 """
 }
 

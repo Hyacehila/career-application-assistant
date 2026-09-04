@@ -39,7 +39,7 @@ pnpm --dir app\frontend build
 {
   "status": "ok",
   "database": "available",
-  "schema_version": 5,
+  "schema_version": 6,
   "service": "career-application-assistant",
   "mode": "standard",
   "synthetic_data": false,
@@ -73,8 +73,8 @@ pnpm --dir app\frontend build
 | `DELETE` | `/api/mail/accounts/{provider}` | 仅 QQ/163：删除游标与安全凭据状态 |
 | `GET` | `/api/mail/operations/{id}` | 查询脱敏的 QQ/163 连接/同步操作 |
 | `POST` | `/api/mail/outlook-connector/runs` | 申请一次有界的 15 分钟连接器租约与扫描计划 |
-| `POST` | `/api/mail/outlook-connector/runs/{id}/headers` | 门控一页已校验 Inbox 邮件头并签发正文 token |
-| `POST` | `/api/mail/outlook-connector/runs/{id}/messages` | 将最多 20 封已门控正文解析为结构化结果 |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/headers` | 登记一页已校验 Inbox 邮件头，并为每封签发 Agent 决策 token |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/messages` | 解析最多 20 个 Agent 邮件头/正文决定，并提取批准处理的正文 |
 | `POST` | `/api/mail/outlook-connector/runs/{id}/complete` | 提交已完整处理的窗口进度 |
 | `POST` | `/api/mail/outlook-connector/runs/{id}/fail` | 使用白名单脱敏错误码释放运行 |
 | `GET` | `/api/mail/candidates` | 返回不含原始邮件字段的结构化候选 |

@@ -55,6 +55,7 @@ def _message(header: dict, body_token: str, *, body: str, **overrides) -> dict:
     item = {
         **header,
         "body_token": body_token,
+        "agent_decision": "process",
         "body": body,
         "content_type": "text",
         "body_status": "available",
@@ -155,7 +156,9 @@ def test_window_progress_is_verified_and_backlog_resumes_without_cursor_jump(cli
     header["subject"] = "Monthly account statement"
     header["sender"] = "system.example.invalid"
     gated = _gate(client, run, window, header)
-    assert gated["body_tokens"] == []
+    assert gated["issued_count"] == 1
+    assert gated["seen_before_count"] == 0
+    assert gated["body_tokens"][0]["seen_before"] is False
 
     wrong = client.post(
         f"/api/mail/outlook-connector/runs/{run['run_id']}/complete",
@@ -171,6 +174,23 @@ def test_window_progress_is_verified_and_backlog_resumes_without_cursor_jump(cli
         },
     )
     assert wrong.status_code == 422
+
+    skipped = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={
+            "items": [
+                _message(
+                    header,
+                    gated["body_tokens"][0]["body_token"],
+                    body="",
+                    agent_decision="skip_header",
+                    body_status="not_submitted",
+                )
+            ]
+        },
+    )
+    assert skipped.status_code == 200
+    assert skipped.json()["skipped_header_count"] == 1
 
     completed = _complete(
         client,
@@ -254,6 +274,152 @@ def test_body_tokens_are_server_issued_bound_single_use_and_required_before_comp
         json={"items": [_message(header, body_token, body="第一轮面试时间：2026年9月8日")]},
     )
     assert replay.status_code == 422
+
+
+def test_backend_issues_every_header_and_seen_before_never_blocks_agent_review(client) -> None:
+    run = _start(client)
+    window = run["windows"][0]
+    header = _header(window, token="ordinary-1", source_id="ordinary-source")
+    header["subject"] = "Monthly account statement"
+    header["sender"] = "system.example.invalid"
+
+    first = _gate(client, run, window, header)
+    assert first["issued_count"] == 1
+    assert first["seen_before_count"] == 0
+    assert first["body_tokens"][0]["seen_before"] is False
+
+    processed = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={
+            "items": [
+                _message(
+                    header,
+                    first["body_tokens"][0]["body_token"],
+                    body="第一轮面试时间：2026年9月8日 10:00",
+                )
+            ]
+        },
+    )
+    assert processed.status_code == 200
+    assert processed.json()["queued_count"] == 1
+
+    repeated_header = {**header, "token": "ordinary-2"}
+    repeated = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/headers",
+        json={
+            "window_id": window["id"],
+            "from_index": window["from_index"] + 1,
+            "items": [repeated_header],
+        },
+    )
+    assert repeated.status_code == 200, repeated.text
+    repeated_payload = repeated.json()
+    assert repeated_payload["issued_count"] == 1
+    assert repeated_payload["seen_before_count"] == 1
+    assert repeated_payload["body_tokens"][0]["seen_before"] is True
+
+    skipped = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={
+            "items": [
+                _message(
+                    repeated_header,
+                    repeated_payload["body_tokens"][0]["body_token"],
+                    body="",
+                    agent_decision="skip_header",
+                    body_status="not_submitted",
+                )
+            ]
+        },
+    )
+    assert skipped.status_code == 200
+    assert skipped.json()["skipped_header_count"] == 1
+
+
+def test_agent_can_skip_after_header_or_body_without_persisting_mail(client) -> None:
+    run = _start(client)
+    window = run["windows"][0]
+    headers = [
+        _header(window, token="skip-header", source_id="skip-header-source"),
+        _header(window, token="skip-body", source_id="skip-body-source"),
+    ]
+    gated_response = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/headers",
+        json={
+            "window_id": window["id"],
+            "from_index": window["from_index"],
+            "items": headers,
+        },
+    )
+    assert gated_response.status_code == 200, gated_response.text
+    tokens = {
+        item["token"]: item["body_token"]
+        for item in gated_response.json()["body_tokens"]
+    }
+    resolved = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={
+            "items": [
+                _message(
+                    headers[0],
+                    tokens["skip-header"],
+                    body="",
+                    agent_decision="skip_header",
+                    body_status="not_submitted",
+                ),
+                _message(
+                    headers[1],
+                    tokens["skip-body"],
+                    body="",
+                    agent_decision="skip_body",
+                    body_status="not_submitted",
+                ),
+            ]
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json() == {
+        "accepted_count": 0,
+        "queued_count": 0,
+        "committed_count": 0,
+        "duplicate_count": 0,
+        "unstructured_count": 0,
+        "skipped_header_count": 1,
+        "skipped_body_count": 1,
+    }
+    candidates = client.get("/api/mail/candidates", params={"state": "pending"})
+    assert candidates.status_code == 200
+    assert candidates.json()["total"] == 0
+
+
+def test_agent_decision_is_required_and_skips_cannot_smuggle_body_content(client) -> None:
+    run = _start(client)
+    window = run["windows"][0]
+    header = _header(window, source_id="decision-contract")
+    token = _gate(client, run, window, header)["body_tokens"][0]["body_token"]
+
+    missing_decision = _message(header, token, body="do not persist")
+    missing_decision.pop("agent_decision")
+    response = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={"items": [missing_decision]},
+    )
+    assert response.status_code == 422
+    assert "do not persist" not in response.text
+
+    smuggled_body = _message(
+        header,
+        token,
+        body="do not persist",
+        agent_decision="skip_body",
+        body_status="not_submitted",
+    )
+    response = client.post(
+        f"/api/mail/outlook-connector/runs/{run['run_id']}/messages",
+        json={"items": [smuggled_body]},
+    )
+    assert response.status_code == 422
+    assert "do not persist" not in response.text
 
 
 def test_structured_auto_commit_and_raw_mail_never_reach_database_response_or_logs(

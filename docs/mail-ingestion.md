@@ -27,11 +27,11 @@ The skill can use only folder listing, message listing, and batch message fetch 
 1. `POST /api/mail/outlook-connector/runs` grants one exclusive 15-minute lease and returns up to two fixed scan windows.
 2. The first run covers at most the latest 30 days. Later runs prioritize a recent overlap while retaining unfinished historical windows.
 3. A task processes at most 200 headers, newest increment first. Pagination offsets are verified per leased window.
-4. `.../headers` accepts only bounded subject/sender/time/source-ID fields and returns server-issued, single-use body tokens for likely recruitment mail.
-5. Gated messages are fetched in batches of at most 20. Each UTF-8 body is limited to 512 KiB and each submitted batch to 2 MiB. HTML becomes plain text offline.
-6. `.../complete` advances only fully accounted windows after every issued body token is resolved. `.../fail` releases the lease using an allowlisted error code.
+4. `.../headers` accepts only bounded subject/sender/time/source-ID fields and returns one server-issued, single-use decision token for every validated header. `seen_before` is a factual fingerprint hint, never a server-side skip decision.
+5. The Agent reviews every header and explicitly chooses `fetch` or `skip_header`. Selected messages are fetched in batches of at most 20; after reading each body, the Agent explicitly chooses `process` or `skip_body`. No keyword rule in the backend or orchestration JavaScript may make either semantic choice.
+6. Each UTF-8 body is limited to 512 KiB and each submitted batch to 2 MiB. Agent-approved HTML becomes plain text offline. `.../complete` advances only fully accounted windows after every header has an Agent decision; `.../fail` releases the lease using an allowlisted error code.
 
-Connector results remain inside the orchestration call. Mail JSON is sent to [the fixed wrapper](../scripts/Invoke-OutlookConnectorSync.ps1) over standard input, never a command argument or temporary file. Interactive terminals disable echo and line buffering, and return sanitized results as ordered short frames so console wrapping cannot corrupt JSON. Some connector list responses include extra message fields; the skill immediately projects only header data and does not display, log, or submit incidental bodies, recipients, attachment flags, or links.
+Raw connector responses, message IDs, and temporary tokens remain inside private orchestration state. Bounded header and body review packets enter the current Codex task context so the Agent can decide; they are not repeated in normal status output. Mail JSON is sent to [the fixed wrapper](../scripts/Invoke-OutlookConnectorSync.ps1) over standard input, never a command argument or temporary file. Interactive terminals disable echo and line buffering, and return sanitized results as ordered short frames so console wrapping cannot corrupt JSON. Incidental bodies, recipients, attachment flags, and links returned by list operations are discarded.
 
 ## QQ Mail and 163 Mail
 
@@ -41,7 +41,7 @@ The service uses verified TLS on port 993, opens Inbox with read-only `EXAMINE`,
 
 ## Extraction and persistence
 
-Only assessments and exact first, second, third, or HR interview rounds can be appended automatically, and only with one active application match, explicit required dates, a safe transition, and confidence at or above the threshold.
+Only messages explicitly approved for processing by the Agent reach deterministic extraction. Assessments and exact first, second, third, or HR interview rounds can be appended automatically only with one active application match, explicit required dates, a safe transition, and confidence at or above the threshold.
 
 Generic interviews, ambiguous or conflicting dates, missing or multiple matches, `applied`, offers, rejections, withdrawals, archived applications, ended-record restarts, and unsafe transitions remain in the human-review queue. `applied` always requires a `user_confirmation` event after personal final submission.
 
@@ -61,6 +61,6 @@ The Outlook card says it is managed by the Codex connector and offers only pause
 | A candidate is not auto-applied | Review the reason code; ambiguity and unsafe transitions deliberately require a person. |
 | A run is interrupted | Start a later Codex task; the lease expires and unfinished windows remain queued without cursor advancement. |
 
-The v5 migration removes old Outlook account rows, Graph cursors, and Outlook review candidates while preserving committed application timeline events. Startup also removes only strictly named legacy MSAL cache files beneath the fixed local application-data directory and fails closed on an unsafe path or deletion error.
+The v5 migration removes old Outlook account rows, Graph cursors, and Outlook review candidates while preserving committed application timeline events. The v6 migration releases any transient v5 connector lease and permits repeated header decision tokens so an overlap or `seen_before` hint cannot block Agent review. Startup also removes only strictly named legacy MSAL cache files beneath the fixed local application-data directory and fails closed on an unsafe path or deletion error.
 
 Public API details are in [Development and API reference](development.md), and persistence limits are in [Security and privacy](security-and-privacy.md).

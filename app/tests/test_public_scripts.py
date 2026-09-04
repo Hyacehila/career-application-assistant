@@ -139,7 +139,7 @@ def _synthetic_health_server(*, demo_identity: bool):
             body = {
                 "status": "ok",
                 "database": "available",
-                "schema_version": 5,
+                "schema_version": 6,
                 "service": (
                     "career-application-assistant" if demo_identity else "unknown-service"
                 ),
@@ -216,7 +216,7 @@ def _synthetic_outlook_ingest_server():
                 {
                     "status": "ok",
                     "database": "available",
-                    "schema_version": 5,
+                    "schema_version": 6,
                     "service": "career-application-assistant",
                     "mode": "standard",
                     "synthetic_data": False,
@@ -246,7 +246,9 @@ def _synthetic_outlook_ingest_server():
                     "queued_count": 1,
                     "committed_count": 0,
                     "duplicate_count": 0,
-                    "ignored_count": 0,
+                    "unstructured_count": 0,
+                    "skipped_header_count": 0,
+                    "skipped_body_count": 0,
                 }
             payload = json.dumps(result).encode("utf-8")
             self.send_response(200)

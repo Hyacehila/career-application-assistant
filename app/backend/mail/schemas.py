@@ -196,31 +196,44 @@ class OutlookHeaderBatchRequest(StrictModel):
         tokens = [item.token for item in self.items]
         if len(tokens) != len(set(tokens)):
             raise ValueError("Header tokens must be unique within a batch.")
+        source_ids = [item.source_id for item in self.items]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("Outlook source IDs must be unique within a header batch.")
         return self
 
 
 class OutlookBodyTokenOut(StrictModel):
     token: str
     body_token: str
+    seen_before: bool
 
 
 class OutlookHeaderBatchOut(StrictModel):
     body_tokens: list[OutlookBodyTokenOut]
-    duplicate_count: int = Field(ge=0)
-    ignored_count: int = Field(ge=0)
+    issued_count: int = Field(ge=0, le=200)
+    seen_before_count: int = Field(ge=0, le=200)
     remaining_budget: int = Field(ge=0, le=200)
 
 
 class OutlookMessageItem(OutlookHeaderItem):
     body_token: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    agent_decision: Literal["process", "skip_header", "skip_body"]
     body: str = Field(default="", max_length=524_288)
     content_type: Literal["text", "html"] = "text"
-    body_status: Literal["available", "missing", "too_large"] = "available"
+    body_status: Literal["available", "missing", "too_large", "not_submitted"] = (
+        "available"
+    )
 
     @model_validator(mode="after")
     def _bounded_body(self) -> "OutlookMessageItem":
         if len(self.body.encode("utf-8")) > 524_288:
             raise ValueError("Message body exceeds the 512 KiB UTF-8 limit.")
+        if self.agent_decision == "process" and self.body_status == "not_submitted":
+            raise ValueError("A processed message must resolve its body status.")
+        if self.agent_decision != "process" and self.body_status != "not_submitted":
+            raise ValueError("A skipped message must not submit a body status.")
+        if self.agent_decision != "process" and self.body:
+            raise ValueError("A skipped message must not submit body content.")
         if self.body_status != "available" and self.body:
             raise ValueError("Unavailable message bodies must be empty.")
         return self
@@ -247,7 +260,9 @@ class OutlookMessageBatchOut(StrictModel):
     queued_count: int = Field(ge=0)
     committed_count: int = Field(ge=0)
     duplicate_count: int = Field(ge=0)
-    ignored_count: int = Field(ge=0)
+    unstructured_count: int = Field(ge=0)
+    skipped_header_count: int = Field(ge=0)
+    skipped_body_count: int = Field(ge=0)
 
 
 class OutlookWindowCompletion(StrictModel):

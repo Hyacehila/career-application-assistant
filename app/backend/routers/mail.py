@@ -130,11 +130,11 @@ def start_outlook_connector_run(request: Request) -> OutlookRunStartOut:
 @router.post(
     "/outlook-connector/runs/{run_id}/headers", response_model=OutlookHeaderBatchOut
 )
-def gate_outlook_connector_headers(
+def register_outlook_connector_headers(
     request: Request, run_id: str, payload: OutlookHeaderBatchRequest
 ) -> OutlookHeaderBatchOut:
     with _outlook_write(request) as connection:
-        return outlook_connector.gate_headers(connection, run_id, payload)
+        return outlook_connector.register_headers(connection, run_id, payload)
 
 
 @router.post(

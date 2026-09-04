@@ -94,7 +94,7 @@ The initializer is safe to repeat: it creates missing `private/resume_materials.
 - Five-column board and detailed table with search, filters, sorting, pagination, responsive layout, details, next actions, and soft deletion.
 - Ten precise statuses represented as append-only, validated timeline events; `applied` always requires explicit user confirmation.
 - Typed Agent endpoints and a PowerShell wrapper for recording prepared forms and later status updates without direct SQLite access.
-- Optional read-only intake for Outlook through the Codex Outlook Email connector and for QQ/163 through local TLS IMAP, with a structured human-review queue.
+- Optional read-only intake for Outlook through Agent-reviewed Codex Outlook Email connector packets and for QQ/163 through local TLS IMAP, with a structured human-review queue.
 - A synthetic, resettable demo that cannot access the production database, Agent routes, or mail runtime.
 - Backend, frontend, browser-loop, release-policy, and Windows CI checks that do not require live recruitment or mailbox accounts.
 
