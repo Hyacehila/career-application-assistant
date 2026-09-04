@@ -21,7 +21,7 @@ describe('api client', () => {
     const healthPayload = {
       status: 'ok',
       database: 'ready',
-      schema_version: 4,
+      schema_version: 5,
       service: 'career-application-assistant',
       mode: 'demo',
       synthetic_data: true,
@@ -100,6 +100,7 @@ describe('api client', () => {
       if (url.endsWith('/sync')) return Promise.resolve(jsonBody({ operation_id: 'op-1', status: 'pending' }, 202))
       return Promise.resolve(jsonBody({
         provider: 'qq',
+        connection_mode: 'local_imap',
         status: url.endsWith('/pause') ? 'paused' : 'connected',
         masked_address: null,
         history_window: 'new_only',

@@ -14,6 +14,7 @@ import type {
   ApplicationRecord,
   ConnectMailPayload,
   HistoryWindow,
+  LocalImapProvider,
   MailAccount,
   MailCandidate,
   MailProvider,
@@ -21,12 +22,10 @@ import type {
 } from '../api/client'
 import styles from './MailIngestionView.module.css'
 
-const PROVIDER_META: Record<MailProvider, { name: string; short: string; helpUrl: string; helpLabel: string }> = {
+const PROVIDER_META: Record<MailProvider, { name: string; short: string; helpUrl?: string; helpLabel?: string }> = {
   outlook: {
     name: 'Outlook',
     short: 'O',
-    helpUrl: 'https://learn.microsoft.com/zh-cn/graph/auth-register-app-v2',
-    helpLabel: '查看 Microsoft 应用注册说明',
   },
   qq: {
     name: 'QQ 邮箱',
@@ -115,11 +114,11 @@ interface ProviderCardProps {
   account: MailAccount
   operationKind?: 'connect' | 'sync'
   busy: boolean
-  onConnect: (provider: MailProvider, body: ConnectMailPayload) => Promise<void>
-  onSync: (provider: MailProvider) => Promise<void>
+  onConnect: (provider: LocalImapProvider, body: ConnectMailPayload) => Promise<void>
+  onSync: (provider: LocalImapProvider) => Promise<void>
   onPause: (provider: MailProvider) => Promise<void>
   onResume: (provider: MailProvider) => Promise<void>
-  onDisconnectRequest: (provider: MailProvider) => void
+  onDisconnectRequest: (provider: LocalImapProvider) => void
   onNotify: MailIngestionViewProps['onNotify']
 }
 
@@ -135,21 +134,21 @@ function ProviderCard({
   onNotify,
 }: ProviderCardProps) {
   const meta = PROVIDER_META[account.provider]
+  const isConnector = account.connection_mode === 'codex_connector'
+  const imapProvider: LocalImapProvider | null = account.provider === 'outlook' ? null : account.provider
   const [editingConnection, setEditingConnection] = useState(false)
   const [historyWindow, setHistoryWindow] = useState<HistoryWindow>(account.history_window)
-  const [clientId, setClientId] = useState('')
   const [mailboxAddress, setMailboxAddress] = useState('')
   const [authorizationCode, setAuthorizationCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const showConnectionForm = account.status === 'disconnected'
+  const showConnectionForm = !isConnector && (account.status === 'disconnected'
     || account.status === 'needs_reauth'
     || account.status === 'error'
-    || editingConnection
+    || editingConnection)
   const operationLabel = operationKind === 'connect' ? '正在完成连接…' : operationKind === 'sync' ? '正在同步…' : null
   const actionBusy = busy || Boolean(operationKind) || account.status === 'connecting' || submitting
 
   const clearConnectionFields = () => {
-    setClientId('')
     setMailboxAddress('')
     setAuthorizationCode('')
   }
@@ -161,25 +160,24 @@ function ProviderCard({
   }
 
   const requestDisconnect = () => {
+    if (!imapProvider) return
     clearConnectionFields()
     setEditingConnection(false)
-    onDisconnectRequest(account.provider)
+    onDisconnectRequest(imapProvider)
   }
 
   const handleConnect = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (actionBusy) return
+    if (actionBusy || !imapProvider) return
     setSubmitting(true)
-    const body: ConnectMailPayload = account.provider === 'outlook'
-      ? { client_id: clientId.trim(), history_window: historyWindow }
-      : {
-          mailbox_address: mailboxAddress.trim(),
-          authorization_code: authorizationCode,
-          history_window: historyWindow,
-        }
+    const body: ConnectMailPayload = {
+      mailbox_address: mailboxAddress.trim(),
+      authorization_code: authorizationCode,
+      history_window: historyWindow,
+    }
     clearConnectionFields()
     try {
-      await onConnect(account.provider, body)
+      await onConnect(imapProvider, body)
       setEditingConnection(false)
       onNotify(`${meta.name} 连接请求已启动`)
     } catch {
@@ -206,10 +204,14 @@ function ProviderCard({
         </span>
         <div className={styles.providerTitleBlock}>
           <h2 id={`mail-provider-${account.provider}`}>{meta.name}</h2>
-          <p className={styles.maskedAddress}>{account.masked_address || '尚未绑定账号'}</p>
+          <p className={styles.maskedAddress}>
+            {isConnector ? '由 Codex Outlook 连接器管理' : account.masked_address || '尚未绑定账号'}
+          </p>
         </div>
         <span className={cn(styles.statusBadge, styles[`status_${account.status}`])} role="status" aria-live="polite">
-          {operationLabel || ACCOUNT_STATUS_LABELS[account.status]}
+          {operationLabel || (isConnector && account.status === 'disconnected'
+            ? '等待新任务同步'
+            : ACCOUNT_STATUS_LABELS[account.status])}
         </span>
       </div>
 
@@ -232,50 +234,62 @@ function ProviderCard({
 
       {account.error_code ? <p className={styles.accountError}>错误码：{account.error_code}</p> : null}
 
-      {showConnectionForm ? (
-        <form className={styles.connectForm} onSubmit={handleConnect} aria-label={`连接 ${meta.name}`}>
-          {account.provider === 'outlook' ? (
-            <label className={styles.field}>
-              <span>Microsoft Entra 应用 Client ID</span>
-              <input
-                type="text"
-                inputMode="text"
-                autoComplete="off"
-                value={clientId}
-                onChange={(event) => setClientId(event.target.value)}
-                placeholder="00000000-0000-0000-0000-000000000000"
-                required
+      {isConnector ? (
+        <div className={styles.connectForm}>
+          <p className={styles.securityHint}>
+            <ShieldCheck size={15} aria-hidden="true" />
+            每个新的 Codex 任务会尝试一次只读同步；登录与权限由 Codex 连接器统一管理。
+          </p>
+          <div className={styles.accountActions}>
+            {account.status === 'paused' ? (
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => runAction(() => onResume(account.provider), `${meta.name} 已恢复自动同步`)}
                 disabled={actionBusy}
-              />
-            </label>
-          ) : (
-            <>
-              <label className={styles.field}>
-                <span>邮箱地址</span>
-                <input
-                  type="email"
-                  autoComplete="off"
-                  value={mailboxAddress}
-                  onChange={(event) => setMailboxAddress(event.target.value)}
-                  placeholder={account.provider === 'qq' ? '例如：QQ 邮箱地址' : '例如：163 邮箱地址'}
-                  required
-                  disabled={actionBusy}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>客户端授权码</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={authorizationCode}
-                  onChange={(event) => setAuthorizationCode(event.target.value)}
-                  placeholder="不是邮箱登录密码"
-                  required
-                  disabled={actionBusy}
-                />
-              </label>
-            </>
-          )}
+              >
+                <Play size={15} aria-hidden="true" />
+                恢复新任务同步
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => runAction(() => onPause(account.provider), `${meta.name} 已暂停自动同步`)}
+                disabled={actionBusy}
+              >
+                <Pause size={15} aria-hidden="true" />
+                暂停新任务同步
+              </button>
+            )}
+          </div>
+        </div>
+      ) : showConnectionForm ? (
+        <form className={styles.connectForm} onSubmit={handleConnect} aria-label={`连接 ${meta.name}`}>
+          <label className={styles.field}>
+            <span>邮箱地址</span>
+            <input
+              type="email"
+              autoComplete="off"
+              value={mailboxAddress}
+              onChange={(event) => setMailboxAddress(event.target.value)}
+              placeholder={account.provider === 'qq' ? '例如：QQ 邮箱地址' : '例如：163 邮箱地址'}
+              required
+              disabled={actionBusy}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>客户端授权码</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={authorizationCode}
+              onChange={(event) => setAuthorizationCode(event.target.value)}
+              placeholder="不是邮箱登录密码"
+              required
+              disabled={actionBusy}
+            />
+          </label>
           <label className={styles.field}>
             <span>首次读取范围</span>
             <select
@@ -291,7 +305,9 @@ function ProviderCard({
             只读访问；凭据存入 Windows 安全凭据库，不写入看板数据库。
           </p>
           <div className={styles.formActions}>
-            <a href={meta.helpUrl} target="_blank" rel="noreferrer noopener">{meta.helpLabel}</a>
+            {meta.helpUrl && meta.helpLabel ? (
+              <a href={meta.helpUrl} target="_blank" rel="noreferrer noopener">{meta.helpLabel}</a>
+            ) : null}
             <div className={styles.formButtons}>
               {editingConnection ? (
                 <button type="button" className="secondaryButton" onClick={cancelConnectionEdit}>
@@ -319,7 +335,9 @@ function ProviderCard({
           <button
             type="button"
             className="secondaryButton"
-            onClick={() => runAction(() => onSync(account.provider), `${meta.name} 同步已启动`)}
+            onClick={() => imapProvider
+              ? runAction(() => onSync(imapProvider), `${meta.name} 同步已启动`)
+              : Promise.resolve()}
             disabled={actionBusy || account.status !== 'connected'}
           >
             <RefreshCw size={15} aria-hidden="true" />
@@ -601,7 +619,7 @@ function CandidateCard({ candidate, applications, busy, onConfirm, onDismissRequ
 
 export default function MailIngestionView({ onNotify, onEventCommitted }: MailIngestionViewProps) {
   const mail = useMailIngestion(true)
-  const [disconnectTarget, setDisconnectTarget] = useState<MailProvider | null>(null)
+  const [disconnectTarget, setDisconnectTarget] = useState<LocalImapProvider | null>(null)
   const [dismissTarget, setDismissTarget] = useState<MailCandidate | null>(null)
 
   const handleConfirmCandidate = async (
@@ -708,7 +726,7 @@ export default function MailIngestionView({ onNotify, onEventCommitted }: MailIn
       {disconnectTarget ? (
         <ConfirmDialog
           title={`断开 ${PROVIDER_META[disconnectTarget].name}`}
-          message="将删除此邮箱的本机凭据、令牌和同步游标；已写入的结构化时间线记录会保留。"
+          message="将删除此邮箱的本机授权码凭据和同步游标；已写入的结构化时间线记录会保留。"
           confirmLabel="确认断开"
           danger
           onConfirm={() => mail.disconnect(disconnectTarget)}

@@ -18,7 +18,8 @@ from ..schemas import CreateEvent
 from .classifier import contains_private_contact_info
 from .schemas import MailCandidateConfirmRequest, MailCandidateOut
 
-PROVIDERS = ("outlook", "qq", "163")
+MAIL_PROVIDERS = ("outlook", "qq", "163")
+PROVIDERS = ("qq", "163")
 AUTO_STAGES = {
     "assessment",
     "interview_1",
@@ -126,11 +127,11 @@ def ensure_account(connection: sqlite3.Connection, provider: str) -> dict:
     connection.execute(
         """
         INSERT INTO mail_accounts (
-            id, provider, status, public_client_id, history_window,
+            id, provider, status, history_window,
             last_attempt_at, last_success_at, next_retry_at, last_error_code,
             created_at, updated_at, disconnected_at, connection_generation,
             credential_ref, pending_credential_ref, previous_credential_ref
-        ) VALUES (?, ?, 'disconnected', NULL, 'new_only', NULL, NULL, NULL, NULL,
+        ) VALUES (?, ?, 'disconnected', 'new_only', NULL, NULL, NULL, NULL,
                   ?, ?, ?, ?, NULL, NULL, NULL)
         """,
         (
@@ -166,7 +167,7 @@ def list_account_rows(connection: sqlite3.Connection) -> list[dict]:
             SELECT a.provider, count(c.id) AS pending_count
             FROM mail_accounts a
             LEFT JOIN mail_event_candidates c
-              ON c.account_id = a.id AND c.state = 'pending'
+              ON c.provider = a.provider AND c.state = 'pending'
             GROUP BY a.provider
             """
         ).fetchall()
@@ -199,7 +200,6 @@ def update_account(
     *,
     status: str,
     history_window: str | None = None,
-    public_client_id: str | None | object = ...,
     error_code: str | None | object = ...,
     last_attempt: bool = False,
     last_success: bool = False,
@@ -213,8 +213,6 @@ def update_account(
     fields: dict[str, object] = {"status": status, "updated_at": now_iso()}
     if history_window is not None:
         fields["history_window"] = history_window
-    if public_client_id is not ...:
-        fields["public_client_id"] = public_client_id
     if error_code is not ...:
         fields["last_error_code"] = error_code
     if last_attempt:
@@ -252,7 +250,6 @@ def disconnect_account(connection: sqlite3.Connection, provider: str) -> dict:
         connection,
         provider,
         status="disconnected",
-        public_client_id=None,
         error_code=None,
         next_retry_at=None,
         credential_ref=None,
@@ -268,29 +265,6 @@ def get_cursor(connection: sqlite3.Connection, account_id: str) -> dict | None:
     return dict(row) if row is not None else None
 
 
-def save_graph_cursor(
-    connection: sqlite3.Connection,
-    account_id: str,
-    delta_link: str,
-    initial_cutoff_at: str | None,
-) -> None:
-    connection.execute(
-        """
-        INSERT INTO mail_sync_cursors (
-            account_id, folder_key, graph_delta_link, imap_uidvalidity,
-            imap_last_uid, initial_cutoff_at, updated_at
-        ) VALUES (?, 'inbox', ?, NULL, NULL, ?, ?)
-        ON CONFLICT(account_id) DO UPDATE SET
-            graph_delta_link = excluded.graph_delta_link,
-            imap_uidvalidity = NULL,
-            imap_last_uid = NULL,
-            initial_cutoff_at = excluded.initial_cutoff_at,
-            updated_at = excluded.updated_at
-        """,
-        (account_id, delta_link, initial_cutoff_at, now_iso()),
-    )
-
-
 def save_imap_cursor(
     connection: sqlite3.Connection,
     account_id: str,
@@ -301,11 +275,10 @@ def save_imap_cursor(
     connection.execute(
         """
         INSERT INTO mail_sync_cursors (
-            account_id, folder_key, graph_delta_link, imap_uidvalidity,
+            account_id, folder_key, imap_uidvalidity,
             imap_last_uid, initial_cutoff_at, updated_at
-        ) VALUES (?, 'inbox', NULL, ?, ?, ?, ?)
+        ) VALUES (?, 'inbox', ?, ?, ?, ?)
         ON CONFLICT(account_id) DO UPDATE SET
-            graph_delta_link = NULL,
             imap_uidvalidity = excluded.imap_uidvalidity,
             imap_last_uid = excluded.imap_last_uid,
             initial_cutoff_at = excluded.initial_cutoff_at,
@@ -315,8 +288,16 @@ def save_imap_cursor(
     )
 
 
-def message_fingerprint(account_id: str, provider: str, source_key: str) -> str:
-    material = f"{account_id}\0{provider}\0inbox\0{source_key}".encode("utf-8")
+def message_fingerprint(
+    provider: str,
+    source_key: str,
+    *,
+    fingerprint_scope: str | None = None,
+) -> str:
+    if provider not in MAIL_PROVIDERS:
+        raise validation_error("Unknown mail provider.")
+    prefix = f"{fingerprint_scope}\0" if fingerprint_scope else ""
+    material = f"{prefix}{provider}\0inbox\0{source_key}".encode("utf-8")
     return hashlib.sha256(material).hexdigest()
 
 
@@ -351,9 +332,8 @@ def _candidate_from_row(row: sqlite3.Row | Mapping[str, Any]) -> MailCandidateOu
 def get_candidate(connection: sqlite3.Connection, candidate_id: int) -> MailCandidateOut:
     row = connection.execute(
         """
-        SELECT c.*, a.provider
+        SELECT c.*
         FROM mail_event_candidates c
-        JOIN mail_accounts a ON a.id = c.account_id
         WHERE c.id = ?
         """,
         (candidate_id,),
@@ -374,9 +354,8 @@ def list_candidates(
     )
     rows = connection.execute(
         """
-        SELECT c.*, a.provider
+        SELECT c.*
         FROM mail_event_candidates c
-        JOIN mail_accounts a ON a.id = c.account_id
         WHERE c.state = ?
         ORDER BY c.created_at DESC, c.id DESC
         LIMIT ?
@@ -506,10 +485,10 @@ def _auto_reasons(
 def create_candidate(
     connection: sqlite3.Connection,
     *,
-    account_id: str,
     provider: str,
     source_key: str,
     extracted: Mapping[str, Any],
+    fingerprint_scope: str | None = None,
 ) -> tuple[MailCandidateOut | None, dict | None, dict | None]:
     """Persist one structured extraction and auto-commit only when all gates pass.
 
@@ -534,12 +513,16 @@ def create_candidate(
     event_date = _clean_text(extracted.get("event_date"), 10)
     if event_date is None:
         return None, None, None
-    fingerprint = message_fingerprint(account_id, provider, source_key)
+    if provider not in MAIL_PROVIDERS:
+        raise validation_error("Unknown mail provider.")
+    fingerprint = message_fingerprint(
+        provider,
+        source_key,
+        fingerprint_scope=fingerprint_scope,
+    )
     existing_row = connection.execute(
         """
-        SELECT c.*, a.provider
-        FROM mail_event_candidates c JOIN mail_accounts a ON a.id = c.account_id
-        WHERE c.fingerprint = ?
+        SELECT c.* FROM mail_event_candidates c WHERE c.fingerprint = ?
         """,
         (fingerprint,),
     ).fetchone()
@@ -557,7 +540,7 @@ def create_candidate(
     cursor = connection.execute(
         """
         INSERT INTO mail_event_candidates (
-            account_id, fingerprint, state, commit_mode, company_name, job_title,
+            provider, fingerprint, state, commit_mode, company_name, job_title,
             proposed_stage, event_date, scheduled_date, scheduled_time,
             deadline_date, deadline_time, timezone, confidence,
             matched_application_id, application_event_id, review_reasons,
@@ -565,7 +548,7 @@ def create_candidate(
         ) VALUES (?, ?, 'pending', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
         """,
         (
-            account_id,
+            provider,
             fingerprint,
             _clean_candidate_label(extracted.get("company_name")),
             _clean_candidate_label(extracted.get("job_title")),

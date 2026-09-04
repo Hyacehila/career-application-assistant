@@ -20,6 +20,7 @@ import {
   type MailCandidate,
   type MailOperationKind,
   type MailProvider,
+  type LocalImapProvider,
 } from '../api/client'
 
 const OPERATION_POLL_MS = 1_500
@@ -51,11 +52,11 @@ export interface MailIngestionResult {
   busyCandidates: ReadonlySet<number>
   refetch: () => void
   clearError: () => void
-  connect: (provider: MailProvider, body: ConnectMailPayload) => Promise<void>
-  sync: (provider: MailProvider) => Promise<void>
+  connect: (provider: LocalImapProvider, body: ConnectMailPayload) => Promise<void>
+  sync: (provider: LocalImapProvider) => Promise<void>
   pause: (provider: MailProvider) => Promise<void>
   resume: (provider: MailProvider) => Promise<void>
-  disconnect: (provider: MailProvider) => Promise<void>
+  disconnect: (provider: LocalImapProvider) => Promise<void>
   confirmCandidate: (id: number, body: ConfirmMailCandidatePayload) => Promise<ConfirmMailCandidateResponse>
   dismissCandidate: (id: number) => Promise<void>
 }
@@ -71,6 +72,7 @@ function safeError(error: unknown, action: string): MailQueryError {
 function disconnectedAccount(provider: MailProvider): MailAccount {
   return {
     provider,
+    connection_mode: provider === 'outlook' ? 'codex_connector' : 'local_imap',
     status: 'disconnected',
     masked_address: null,
     history_window: 'new_only',
@@ -239,7 +241,7 @@ export function useMailIngestion(enabled: boolean): MailIngestionResult {
     setAccounts((current) => orderedAccounts(current.filter((item) => item.provider !== account.provider).concat(account)))
   }, [])
 
-  const connect = useCallback(async (provider: MailProvider, body: ConnectMailPayload) => {
+  const connect = useCallback(async (provider: LocalImapProvider, body: ConnectMailPayload) => {
     markProviderBusy(provider, true)
     setError(null)
     try {
@@ -259,7 +261,7 @@ export function useMailIngestion(enabled: boolean): MailIngestionResult {
     }
   }, [markProviderBusy])
 
-  const sync = useCallback(async (provider: MailProvider) => {
+  const sync = useCallback(async (provider: LocalImapProvider) => {
     markProviderBusy(provider, true)
     setError(null)
     try {
@@ -302,7 +304,7 @@ export function useMailIngestion(enabled: boolean): MailIngestionResult {
     [runImmediateAccountAction],
   )
 
-  const disconnect = useCallback(async (provider: MailProvider) => {
+  const disconnect = useCallback(async (provider: LocalImapProvider) => {
     markProviderBusy(provider, true)
     setError(null)
     try {

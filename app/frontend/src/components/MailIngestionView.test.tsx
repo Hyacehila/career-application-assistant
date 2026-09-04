@@ -11,6 +11,7 @@ const FIXTURE_MAILBOX = ['fixture-user', 'qq.example'].join('@')
 const disconnectedAccounts: MailAccount[] = [
   {
     provider: 'outlook',
+    connection_mode: 'codex_connector',
     status: 'disconnected',
     masked_address: null,
     history_window: 'new_only',
@@ -22,6 +23,7 @@ const disconnectedAccounts: MailAccount[] = [
   },
   {
     provider: 'qq',
+    connection_mode: 'local_imap',
     status: 'disconnected',
     masked_address: null,
     history_window: 'new_only',
@@ -33,6 +35,7 @@ const disconnectedAccounts: MailAccount[] = [
   },
   {
     provider: '163',
+    connection_mode: 'local_imap',
     status: 'disconnected',
     masked_address: null,
     history_window: 'new_only',
@@ -111,6 +114,19 @@ describe('MailIngestionView', () => {
     expect(await screen.findByLabelText('待人工复核总数')).toHaveTextContent('待人工复核')
     expect(screen.getByRole('heading', { name: '待人工复核' })).toBeInTheDocument()
     expect(screen.queryByText('待确认投递')).not.toBeInTheDocument()
+  })
+
+  it('Outlook 只显示 Codex 连接器状态和暂停控制，不显示本地 Graph 控件', async () => {
+    setupFetch([])
+    render(<MailIngestionView onNotify={vi.fn()} onEventCommitted={vi.fn()} />)
+
+    const card = await screen.findByRole('article', { name: 'Outlook' })
+    expect(within(card).getByText('由 Codex Outlook 连接器管理')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: '暂停新任务同步' })).toBeInTheDocument()
+    expect(within(card).queryByText(/Client ID/i)).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: '立即同步' })).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: '断开' })).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: '重新授权' })).not.toBeInTheDocument()
   })
 
   it('首次账户状态加载失败时不显示可操作的未连接卡片', async () => {
@@ -379,12 +395,12 @@ describe('MailIngestionView', () => {
     const fetchMock = setupFetch([], (url, init) => {
       if (url === '/api/mail/accounts' && init?.method === 'GET') {
         accountReads += 1
-        const accounts = disconnectedAccounts.map((account) => account.provider === 'outlook'
-          ? { ...account, status: 'connected' as const, masked_address: 'f***@o***.com' }
+        const accounts = disconnectedAccounts.map((account) => account.provider === 'qq'
+          ? { ...account, status: 'connected' as const, masked_address: 'f***@q***.com' }
           : account)
         return jsonBody({ items: accounts, pending_count: 0 })
       }
-      if (url === '/api/mail/accounts/outlook/sync' && init?.method === 'POST') {
+      if (url === '/api/mail/accounts/qq/sync' && init?.method === 'POST') {
         return jsonBody({ operation_id: 'missing-operation', status: 'pending' }, 202)
       }
       if (url === '/api/mail/operations/missing-operation' && init?.method === 'GET') {
@@ -422,12 +438,12 @@ describe('MailIngestionView', () => {
     setupFetch([], (url, init) => {
       if (url === '/api/mail/accounts' && init?.method === 'GET') {
         accountReads += 1
-        const accounts = disconnectedAccounts.map((account) => account.provider === 'outlook'
-          ? { ...account, status: 'connected' as const, masked_address: 'f***@o***.com' }
+        const accounts = disconnectedAccounts.map((account) => account.provider === 'qq'
+          ? { ...account, status: 'connected' as const, masked_address: 'f***@q***.com' }
           : account)
         return jsonBody({ items: accounts, pending_count: 0 })
       }
-      if (url === '/api/mail/accounts/outlook/sync' && init?.method === 'POST') {
+      if (url === '/api/mail/accounts/qq/sync' && init?.method === 'POST') {
         return jsonBody({ operation_id: 'network-failure-operation', status: 'pending' }, 202)
       }
       if (url === '/api/mail/operations/network-failure-operation' && init?.method === 'GET') {

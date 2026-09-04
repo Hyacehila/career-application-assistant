@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 from backend.app import init_database
 from backend.config import Paths
 from backend.database import DatabaseUnavailableError, open_connection
+from backend.mail.store import message_fingerprint
 from backend.migrations import MIGRATIONS, SchemaVersionError, ensure_migrations
 
 
@@ -47,7 +49,7 @@ def test_migrations_are_idempotent(private_root: Path) -> None:
     init_database(paths)
 
 
-def test_v3_and_v4_migrations_preserve_data_and_add_completion_date(private_root: Path) -> None:
+def test_v3_through_v5_migrations_preserve_imap_data_and_add_completion_date(private_root: Path) -> None:
     paths = Paths(repository_root=private_root.parent, private_root=private_root)
     connection = open_connection(paths)
     try:
@@ -95,8 +97,8 @@ def test_v3_and_v4_migrations_preserve_data_and_add_completion_date(private_root
         )
         connection.commit()
 
-        assert ensure_migrations(connection) == 4
-        assert ensure_migrations(connection) == 4
+        assert ensure_migrations(connection) == 5
+        assert ensure_migrations(connection) == 5
         row = connection.execute(
             "SELECT * FROM mail_accounts WHERE id = 'legacy-account'"
         ).fetchone()
@@ -174,7 +176,121 @@ def test_failed_migration_rolls_back_and_can_be_retried(
         assert version == 2
 
         monkeypatch.setitem(MIGRATIONS, 3, original)
-        assert ensure_migrations(connection) == 4
+        assert ensure_migrations(connection) == 5
+    finally:
+        connection.close()
+
+
+def test_v4_to_v5_removes_outlook_local_state_but_preserves_timeline_and_imap(
+    private_root: Path,
+) -> None:
+    paths = Paths(repository_root=private_root.parent, private_root=private_root)
+    connection = open_connection(paths)
+    try:
+        connection.execute(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+        )
+        for version in range(1, 5):
+            connection.executescript(MIGRATIONS[version])
+            connection.execute(
+                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, 'fixture')",
+                (version,),
+            )
+        connection.execute(
+            """
+            INSERT INTO applications (
+                id, company_name, job_title, current_status, created_at, updated_at
+            ) VALUES (1, '示例公司', '示例岗位', 'interview_1', 'fixture', 'fixture')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO application_events (
+                id, application_id, stage, event_date, scheduled_date,
+                timezone, source, created_at, updated_at
+            ) VALUES (
+                1, 1, 'interview_1', '2026-08-20', '2026-08-25',
+                'Asia/Shanghai', 'email_extract', 'fixture', 'fixture'
+            )
+            """
+        )
+        account_sql = """
+            INSERT INTO mail_accounts (
+                id, provider, status, public_client_id, history_window,
+                created_at, updated_at, connection_generation, credential_ref
+            ) VALUES (?, ?, 'connected', ?, 'last_30_days', 'fixture', 'fixture', ?, ?)
+        """
+        connection.execute(account_sql, ("outlook-old", "outlook", "client-id", "gen-o", None))
+        connection.execute(account_sql, ("qq-old", "qq", None, "gen-q", "credential-q"))
+        connection.execute(
+            """
+            INSERT INTO mail_sync_cursors (
+                account_id, graph_delta_link, initial_cutoff_at, updated_at
+            ) VALUES ('outlook-old', 'raw-graph-delta', 'fixture', 'fixture')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO mail_sync_cursors (
+                account_id, imap_uidvalidity, imap_last_uid, initial_cutoff_at, updated_at
+            ) VALUES ('qq-old', 7001, 41, 'fixture', 'fixture')
+            """
+        )
+        candidate_sql = """
+            INSERT INTO mail_event_candidates (
+                account_id, fingerprint, state, commit_mode, proposed_stage,
+                event_date, timezone, confidence, matched_application_id,
+                application_event_id, review_reasons, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, '2026-08-20', 'Asia/Shanghai', 100, 1, ?, '[]', 'fixture', 'fixture')
+        """
+        connection.execute(
+            candidate_sql,
+            ("outlook-old", "outlook-fingerprint", "committed", "auto", "interview_1", 1),
+        )
+        qq_source_key = "gen-q:7001:41"
+        qq_fingerprint = hashlib.sha256(
+            f"qq-old\0qq\0inbox\0{qq_source_key}".encode("utf-8")
+        ).hexdigest()
+        connection.execute(
+            candidate_sql,
+            ("qq-old", qq_fingerprint, "pending", None, "offer", None),
+        )
+        connection.commit()
+
+        assert ensure_migrations(connection) == 5
+        assert [row["provider"] for row in connection.execute("SELECT provider FROM mail_accounts")] == [
+            "qq"
+        ]
+        cursor = connection.execute("SELECT * FROM mail_sync_cursors").fetchone()
+        assert cursor["account_id"] == "qq-old"
+        assert cursor["imap_uidvalidity"] == 7001
+        assert cursor["imap_last_uid"] == 41
+        candidates = connection.execute(
+            "SELECT provider, fingerprint FROM mail_event_candidates"
+        ).fetchall()
+        assert [(row["provider"], row["fingerprint"]) for row in candidates] == [
+            ("qq", qq_fingerprint)
+        ]
+        assert message_fingerprint(
+            "qq", qq_source_key, fingerprint_scope="qq-old"
+        ) == qq_fingerprint
+        event = connection.execute("SELECT * FROM application_events WHERE id = 1").fetchone()
+        assert event["stage"] == "interview_1"
+        assert event["source"] == "email_extract"
+        account_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(mail_accounts)")
+        }
+        cursor_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(mail_sync_cursors)")
+        }
+        candidate_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(mail_event_candidates)")
+        }
+        assert "public_client_id" not in account_columns
+        assert "graph_delta_link" not in cursor_columns
+        assert "account_id" not in candidate_columns
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         connection.close()
 
@@ -184,7 +300,7 @@ def test_unknown_schema_version_stops_startup(private_root: Path) -> None:
     init_database(paths)
 
     connection = open_connection(paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (5, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (6, 'x')")
     connection.commit()
     connection.close()
 
@@ -198,7 +314,7 @@ def test_health_reports_ok_schema_version(client) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["database"] == "available"
-    assert body["schema_version"] == 4
+    assert body["schema_version"] == 5
     assert body["service"] == "career-application-assistant"
     assert body["mode"] == "test"
     assert body["synthetic_data"] is False
@@ -226,7 +342,7 @@ def test_health_returns_503_when_database_is_unavailable(client, private_root: P
 
 def test_health_returns_503_for_incompatible_schema(client) -> None:
     connection = open_connection(client.app.state.paths)
-    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (5, 'x')")
+    connection.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (6, 'x')")
     connection.commit()
     connection.close()
     response = client.get("/api/health")

@@ -32,7 +32,7 @@ def _application(connection, *, status: str = "applied"):
     return application_store.get_application(connection, record.id)
 
 
-def _account(connection, provider: str = "outlook") -> dict:
+def _account(connection, provider: str = "qq") -> dict:
     return store.ensure_account(connection, provider)
 
 
@@ -53,10 +53,8 @@ def test_schema_v2_contains_mail_tables(client) -> None:
 def test_high_confidence_assessment_auto_commits(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
         record = _application(connection)
-        account = _account(connection)
         candidate, updated, event = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="outlook",
             source_key="immutable-synthetic-1",
             extracted={
@@ -79,10 +77,8 @@ def test_high_confidence_assessment_auto_commits(client) -> None:
 
 def test_generic_interview_and_missing_match_stay_pending(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
-        account = _account(connection, "qq")
         candidate, updated, event = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="55:701",
             extracted={
@@ -103,10 +99,8 @@ def test_generic_interview_and_missing_match_stay_pending(client) -> None:
 def test_terminal_event_never_auto_commits(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
         _application(connection)
-        account = _account(connection, "163")
         candidate, _, event = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="163",
             source_key="77:900",
             extracted={
@@ -127,10 +121,8 @@ def test_candidate_store_rejects_contact_details_in_public_labels(client) -> Non
     contact_address = "private-contact" + "@" + "contact.example"
     contact_number = "138" + "0000" + "0000"
     with application_store.open_connection_tx(client.app.state.paths) as connection:
-        account = _account(connection, "qq")
         candidate, _, _ = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="contact-redaction-fixture",
             extracted={
@@ -154,10 +146,8 @@ def test_candidate_store_rejects_contact_details_in_public_labels(client) -> Non
 def test_manual_confirmation_uses_candidate_received_date(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
         record = _application(connection)
-        account = _account(connection, "qq")
         candidate, _, _ = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="12:901",
             extracted={
@@ -186,7 +176,6 @@ def test_expiry_and_disconnect_redact_but_keep_fingerprint(client) -> None:
         account = _account(connection, "163")
         candidate, _, _ = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="163",
             source_key="88:902",
             extracted={
@@ -214,10 +203,8 @@ def test_expiry_and_disconnect_redact_but_keep_fingerprint(client) -> None:
 def test_quote_only_signal_never_auto_commits(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
         _application(connection)
-        account = _account(connection, "qq")
         candidate, _, event = store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="quoted:1",
             extracted={

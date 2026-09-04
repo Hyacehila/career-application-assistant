@@ -44,9 +44,9 @@ Git 忽略规则不能阻止操作系统备份或云盘同步，需要单独配�
 
 ## 邮箱凭据与内容
 
-QQ/163 授权码只写入 Windows Credential Manager，并使用不透明账号目标。Outlook 的 MSAL 缓存由 Windows DPAPI 加密后保存到本地应用数据目录。这些值不会写入 SQLite、日志、配置或 `private/`。安全存储失败时直接失败，绝不回退到明文。
+QQ/163 授权码只写入 Windows Credential Manager，并使用不透明账号目标。Outlook 认证由 Codex Outlook Email 连接器管理；本机服务没有 Outlook Client ID、访问令牌、刷新令牌或缓存。这些值不会写入 SQLite、日志、配置或 `private/`。IMAP 安全存储失败时直接失败，绝不回退到明文。
 
-邮件以增量只读方式处理。原始主题、发件人、正文、附件、私人联系人、验证码和会议链接不会由 API 返回，也不会保留在复核队列中。服务商与保留规则详见[邮件接入](mail-ingestion.zh-CN.md)。
+邮件以增量只读方式处理。Outlook 连接器数据只经标准输入送入固定本机封装；原始主题、发件人、正文、消息 ID、附件、私人联系人、验证码、会议链接和连接器 token 不会由 API 返回，也不会保留在复核队列中。服务商与保留规则详见[邮件接入](mail-ingestion.zh-CN.md)。
 
 ## 公开发布检查
 

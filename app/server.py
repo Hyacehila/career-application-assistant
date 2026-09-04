@@ -13,6 +13,7 @@ if str(APP_DIR) not in sys.path:
 from backend.app import create_app, init_database  # noqa: E402
 from backend.config import default_paths  # noqa: E402
 from backend.database import DatabaseUnavailableError  # noqa: E402
+from backend.mail.legacy_outlook import purge_legacy_outlook_cache  # noqa: E402
 
 
 BUILD_HINT = """<!doctype html>
@@ -57,6 +58,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
+        purge_legacy_outlook_cache()
         init_database(paths)
     except (DatabaseUnavailableError, Exception) as exc:
         print(f"Unable to initialize the local database: {exc}")

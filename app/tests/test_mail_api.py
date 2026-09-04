@@ -35,10 +35,8 @@ def test_candidate_review_api_exposes_only_structured_fields_and_commits(client)
         },
     ).json()
     with application_store.open_connection_tx(client.app.state.paths) as connection:
-        account = mail_store.ensure_account(connection, "qq")
         candidate, _, _ = mail_store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="71:901",
             extracted={
@@ -101,10 +99,8 @@ def test_applied_candidate_requires_explicit_personal_confirmation(client) -> No
         },
     ).json()
     with application_store.open_connection_tx(client.app.state.paths) as connection:
-        account = mail_store.ensure_account(connection, "163")
         candidate, _, _ = mail_store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="163",
             source_key="81:902",
             extracted={
@@ -132,10 +128,8 @@ def test_applied_candidate_requires_explicit_personal_confirmation(client) -> No
 
 def test_dismiss_redacts_pending_candidate(client) -> None:
     with application_store.open_connection_tx(client.app.state.paths) as connection:
-        account = mail_store.ensure_account(connection, "qq")
         candidate, _, _ = mail_store.create_candidate(
             connection,
-            account_id=account["id"],
             provider="qq",
             source_key="91:903",
             extracted={

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-SUPPORTED_SCHEMA_VERSION = 4
+SUPPORTED_SCHEMA_VERSION = 5
 
 MIGRATIONS: dict[int, str] = {
     1: """
@@ -159,6 +159,198 @@ CREATE INDEX idx_mail_accounts_credential_cleanup
 """,
     4: """
 ALTER TABLE application_events ADD COLUMN completed_date TEXT;
+""",
+    5: """
+CREATE TABLE mail_accounts_v5 (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL UNIQUE
+        CHECK (provider IN ('qq', '163')),
+    status TEXT NOT NULL
+        CHECK (status IN (
+            'disconnected', 'connecting', 'connected', 'paused',
+            'needs_reauth', 'error'
+        )),
+    history_window TEXT NOT NULL DEFAULT 'new_only'
+        CHECK (history_window IN ('new_only', 'last_30_days', 'last_90_days')),
+    last_attempt_at TEXT,
+    last_success_at TEXT,
+    next_retry_at TEXT,
+    last_error_code TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    disconnected_at TEXT,
+    connection_generation TEXT NOT NULL DEFAULT '',
+    credential_ref TEXT,
+    pending_credential_ref TEXT,
+    previous_credential_ref TEXT
+);
+
+INSERT INTO mail_accounts_v5 (
+    id, provider, status, history_window, last_attempt_at, last_success_at,
+    next_retry_at, last_error_code, created_at, updated_at, disconnected_at,
+    connection_generation, credential_ref, pending_credential_ref,
+    previous_credential_ref
+)
+SELECT
+    id, provider, status, history_window, last_attempt_at, last_success_at,
+    next_retry_at, last_error_code, created_at, updated_at, disconnected_at,
+    connection_generation, credential_ref, pending_credential_ref,
+    previous_credential_ref
+FROM mail_accounts
+WHERE provider IN ('qq', '163');
+
+CREATE TABLE mail_sync_cursors_v5 (
+    account_id TEXT PRIMARY KEY
+        REFERENCES mail_accounts_v5 (id) ON DELETE CASCADE,
+    folder_key TEXT NOT NULL DEFAULT 'inbox'
+        CHECK (folder_key = 'inbox'),
+    imap_uidvalidity INTEGER,
+    imap_last_uid INTEGER,
+    initial_cutoff_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
+INSERT INTO mail_sync_cursors_v5 (
+    account_id, folder_key, imap_uidvalidity, imap_last_uid,
+    initial_cutoff_at, updated_at
+)
+SELECT
+    c.account_id, c.folder_key, c.imap_uidvalidity, c.imap_last_uid,
+    c.initial_cutoff_at, c.updated_at
+FROM mail_sync_cursors c
+JOIN mail_accounts a ON a.id = c.account_id
+WHERE a.provider IN ('qq', '163');
+
+CREATE TABLE mail_event_candidates_v5 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL
+        CHECK (provider IN ('outlook', 'qq', '163')),
+    fingerprint TEXT NOT NULL UNIQUE,
+    state TEXT NOT NULL
+        CHECK (state IN ('pending', 'committed', 'dismissed', 'expired', 'duplicate')),
+    commit_mode TEXT
+        CHECK (commit_mode IS NULL OR commit_mode IN ('auto', 'manual')),
+    company_name TEXT,
+    job_title TEXT,
+    proposed_stage TEXT
+        CHECK (proposed_stage IS NULL OR proposed_stage IN (
+            'applied', 'assessment', 'interview_1', 'interview_2',
+            'interview_3', 'interview_hr', 'interview_unspecified',
+            'offer', 'rejected', 'withdrawn'
+        )),
+    event_date TEXT,
+    scheduled_date TEXT,
+    scheduled_time TEXT,
+    deadline_date TEXT,
+    deadline_time TEXT,
+    timezone TEXT NOT NULL DEFAULT 'Asia/Shanghai',
+    confidence INTEGER NOT NULL DEFAULT 0
+        CHECK (confidence BETWEEN 0 AND 100),
+    matched_application_id INTEGER
+        REFERENCES applications (id) ON DELETE SET NULL,
+    application_event_id INTEGER UNIQUE
+        REFERENCES application_events (id) ON DELETE SET NULL,
+    review_reasons TEXT NOT NULL DEFAULT '[]',
+    expires_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+INSERT INTO mail_event_candidates_v5 (
+    id, provider, fingerprint, state, commit_mode, company_name, job_title,
+    proposed_stage, event_date, scheduled_date, scheduled_time,
+    deadline_date, deadline_time, timezone, confidence,
+    matched_application_id, application_event_id, review_reasons,
+    expires_at, created_at, updated_at
+)
+SELECT
+    c.id, a.provider, c.fingerprint, c.state, c.commit_mode,
+    c.company_name, c.job_title, c.proposed_stage, c.event_date,
+    c.scheduled_date, c.scheduled_time, c.deadline_date, c.deadline_time,
+    c.timezone, c.confidence, c.matched_application_id,
+    c.application_event_id, c.review_reasons, c.expires_at,
+    c.created_at, c.updated_at
+FROM mail_event_candidates c
+JOIN mail_accounts a ON a.id = c.account_id
+WHERE a.provider IN ('qq', '163');
+
+DROP TABLE mail_event_candidates;
+DROP TABLE mail_sync_cursors;
+DROP TABLE mail_accounts;
+
+ALTER TABLE mail_accounts_v5 RENAME TO mail_accounts;
+ALTER TABLE mail_sync_cursors_v5 RENAME TO mail_sync_cursors;
+ALTER TABLE mail_event_candidates_v5 RENAME TO mail_event_candidates;
+
+CREATE INDEX idx_mail_accounts_status
+    ON mail_accounts (status, provider);
+CREATE INDEX idx_mail_accounts_credential_cleanup
+    ON mail_accounts (provider, pending_credential_ref, previous_credential_ref);
+CREATE INDEX idx_mail_candidates_queue
+    ON mail_event_candidates (state, expires_at, created_at);
+CREATE INDEX idx_mail_candidates_provider
+    ON mail_event_candidates (provider, created_at);
+
+CREATE TABLE outlook_connector_state (
+    singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+    status TEXT NOT NULL DEFAULT 'disconnected'
+        CHECK (status IN (
+            'disconnected', 'connecting', 'connected', 'paused',
+            'needs_reauth', 'error'
+        )),
+    history_window TEXT NOT NULL DEFAULT 'last_30_days'
+        CHECK (history_window = 'last_30_days'),
+    last_planned_at TEXT,
+    last_attempt_at TEXT,
+    last_success_at TEXT,
+    last_error_code TEXT,
+    active_run_id TEXT,
+    lease_expires_at TEXT,
+    headers_seen INTEGER NOT NULL DEFAULT 0 CHECK (headers_seen BETWEEN 0 AND 200),
+    bodies_seen INTEGER NOT NULL DEFAULT 0 CHECK (bodies_seen BETWEEN 0 AND 200),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+INSERT INTO outlook_connector_state (
+    singleton_id, status, history_window, created_at, updated_at
+) VALUES (
+    1, 'disconnected', 'last_30_days',
+    strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')
+);
+
+CREATE TABLE outlook_scan_windows (
+    id TEXT PRIMARY KEY,
+    window_kind TEXT NOT NULL CHECK (window_kind IN ('live', 'backfill')),
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    next_from_index INTEGER NOT NULL DEFAULT 0 CHECK (next_from_index >= 0),
+    leased_by_run_id TEXT,
+    lease_start_index INTEGER,
+    lease_headers_seen INTEGER NOT NULL DEFAULT 0 CHECK (lease_headers_seen >= 0),
+    lease_limit INTEGER CHECK (lease_limit IS NULL OR lease_limit BETWEEN 1 AND 200),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (window_kind, start_at, end_at)
+);
+
+CREATE INDEX idx_outlook_scan_windows_order
+    ON outlook_scan_windows (end_at DESC, created_at ASC);
+
+CREATE TABLE outlook_connector_body_tokens (
+    run_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    header_hash TEXT NOT NULL,
+    consumed INTEGER NOT NULL DEFAULT 0 CHECK (consumed IN (0, 1)),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (run_id, token_hash),
+    UNIQUE (run_id, fingerprint)
+);
+
+CREATE INDEX idx_outlook_body_tokens_run
+    ON outlook_connector_body_tokens (run_id, consumed);
 """
 }
 

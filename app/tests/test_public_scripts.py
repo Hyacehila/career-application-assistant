@@ -18,13 +18,19 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PWSH = shutil.which("pwsh")
 
 
-def _run_script(script: Path, *arguments: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_script(
+    script: Path,
+    *arguments: str,
+    cwd: Path | None = None,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     if PWSH is None:
         pytest.skip("pwsh is required")
     return subprocess.run(
         [PWSH, "-NoProfile", "-File", str(script), *arguments],
         cwd=cwd or script.parent.parent,
         capture_output=True,
+        input=input_text,
         text=True,
         encoding="utf-8",
         timeout=20,
@@ -133,7 +139,7 @@ def _synthetic_health_server(*, demo_identity: bool):
             body = {
                 "status": "ok",
                 "database": "available",
-                "schema_version": 4,
+                "schema_version": 5,
                 "service": (
                     "career-application-assistant" if demo_identity else "unknown-service"
                 ),
@@ -192,6 +198,120 @@ def test_demo_script_fails_closed_when_unknown_service_owns_port() -> None:
 
     assert result.returncode != 0
     assert "unknown service" in result.stdout
+
+
+@contextmanager
+def _synthetic_outlook_ingest_server():
+    class Handler(BaseHTTPRequestHandler):
+        posts: list[tuple[str, bytes]] = []
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path != "/api/health":
+                self.send_error(404)
+                return
+            payload = json.dumps(
+                {
+                    "status": "ok",
+                    "database": "available",
+                    "schema_version": 5,
+                    "service": "career-application-assistant",
+                    "mode": "standard",
+                    "synthetic_data": False,
+                    "mail_ingestion": True,
+                }
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            self.__class__.posts.append((self.path, body))
+            if self.path == "/api/mail/outlook-connector/runs":
+                result = {
+                    "state": "started",
+                    "run_id": "00000000-0000-0000-0000-000000000001",
+                    "remaining_budget": 200,
+                    "windows": [],
+                }
+            else:
+                result = {
+                    "accepted_count": 1,
+                    "queued_count": 1,
+                    "committed_count": 0,
+                    "duplicate_count": 0,
+                    "ignored_count": 0,
+                }
+            payload = json.dumps(result).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 8000), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield Handler
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_outlook_connector_wrapper_uses_fixed_routes_and_stdin_without_echo() -> None:
+    if not _port_is_free(8000):
+        pytest.skip("port 8000 is busy")
+    script = REPOSITORY_ROOT / "scripts" / "Invoke-OutlookConnectorSync.ps1"
+    script_text = script.read_text(encoding="utf-8")
+    assert "[Console]::InputEncoding = $utf8NoBom" in script_text
+    assert "SetConsoleMode" in script_text
+    assert "INPUT_READY" in script_text
+    assert "RESULT_CHUNK" in script_text
+    assert "RESULT_END" in script_text
+    marker = "RAW-MAIL-MARKER-MUST-NOT-BE-ECHOED-中文"
+    run_id = "00000000-0000-0000-0000-000000000001"
+    request = json.dumps({"items": [{"body": marker}]}, ensure_ascii=False)
+    with _synthetic_outlook_ingest_server() as handler:
+        started = _run_script(script, "-Action", "Start")
+        ingested = _run_script(
+            script,
+            "-Action",
+            "Messages",
+            "-RunId",
+            run_id,
+            input_text=request,
+        )
+
+    assert started.returncode == 0, started.stdout + started.stderr
+    assert ingested.returncode == 0, ingested.stdout + ingested.stderr
+    assert marker not in ingested.stdout + ingested.stderr
+    assert handler.posts[0] == ("/api/mail/outlook-connector/runs", b"{}")
+    assert handler.posts[1][0] == f"/api/mail/outlook-connector/runs/{run_id}/messages"
+    assert json.loads(handler.posts[1][1]) == json.loads(request)
+
+
+def test_outlook_connector_wrapper_rejects_missing_run_id_before_reading_mail() -> None:
+    if not _port_is_free(8000):
+        pytest.skip("port 8000 is busy")
+    script = REPOSITORY_ROOT / "scripts" / "Invoke-OutlookConnectorSync.ps1"
+    with _synthetic_outlook_ingest_server() as handler:
+        result = _run_script(
+            script,
+            "-Action",
+            "Headers",
+            input_text='{"marker":"private-marker"}',
+        )
+    assert result.returncode != 0
+    assert "private-marker" not in result.stdout + result.stderr
+    assert handler.posts == []
 
 
 def test_public_release_policy_self_test_is_index_independent() -> None:

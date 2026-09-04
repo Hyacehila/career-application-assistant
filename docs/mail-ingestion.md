@@ -2,69 +2,65 @@
 
 English | [简体中文](mail-ingestion.zh-CN.md)
 
-Mail ingestion is an optional, read-only background capability in standard mode. It is not an inbox client. Demo mode does not construct the mail service or mount `/api/mail/*`.
+Mail ingestion is an optional, read-only capability in standard mode. It is not an inbox client. Demo mode does not construct the mail service or mount `/api/mail/*`.
 
 ## Supported providers
 
-| Provider | Connection | Incremental cursor | Secret storage |
+| Provider | Connection | Incremental state | Secret storage |
 | --- | --- | --- | --- |
-| Outlook / Outlook.com | Microsoft Graph delegated `Mail.Read`, public-client authorization code flow with PKCE | Inbox delta link | MSAL cache encrypted with Windows DPAPI under local application data |
-| QQ Mail | TLS IMAP on port 993 with a separately generated authorization code | `UIDVALIDITY` and last processed UID | Windows Credential Manager |
-| 163 Mail | TLS IMAP on port 993 with a client authorization password | `UIDVALIDITY` and last processed UID | Windows Credential Manager |
+| Outlook / Outlook.com | Codex Outlook Email connector | Fixed Inbox scan windows, overlap watermarks, and persistent backlog | Managed by the Codex connector; no local token cache |
+| QQ Mail | TLS IMAP 993 with a separately generated authorization code | `UIDVALIDITY` and last processed UID | Windows Credential Manager |
+| 163 Mail | TLS IMAP 993 with a client authorization password | `UIDVALIDITY` and last processed UID | Windows Credential Manager |
 
-The implementation has no SMTP, send, reply, forward, delete, move, mark-read, attachment-download, or webhook feature. Provider credentials and tokens are not written to SQLite, configuration files, logs, or `private/`. If secure Windows storage is unavailable, connection fails instead of falling back to plaintext.
+The local Python service has no Outlook Graph client, Entra application registration, MSAL dependency, Client ID, or Outlook token cache. It also has no SMTP, send, reply, forward, draft, delete, move, mark-read, category, attachment-download, or webhook feature.
 
-## Outlook setup
+## Outlook connector setup
 
-Register a Microsoft Entra public client application. Allow personal Microsoft accounts when Outlook.com support is needed, configure `http://localhost` as a mobile/desktop redirect URI, and add only delegated `Mail.Read`. Enter the public Client ID in the local interface; no client secret is used.
+Connect Outlook Email in Codex and complete login or reauthorization yourself. Keep the connector's existing permission setting; this repository narrows its behavior through `AGENTS.md` and [the repository skill](../.agents/skills/outlook-recruitment-sync/SKILL.md).
 
-MSAL performs interactive authorization with PKCE and refreshes through its DPAPI-protected cache. Inbox changes are read through the Microsoft Graph [message delta API](https://learn.microsoft.com/graph/api/message-delta?view=graph-rest-1.0). The authentication implementation uses [MSAL Python](https://github.com/AzureAD/microsoft-authentication-library-for-python); licensing details are in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+At the beginning of each new Codex task in this repository, the skill attempts one bounded sync before continuing the requested work. There is no schedule or background listener. A paused connector, an active lease, or an unchanged mailbox is silent; a failure produces only a sanitized code and does not block the task.
 
-Login, account recovery, CAPTCHA, multi-factor prompts, and external authorization must be completed by the user. The application does not read or enter verification codes.
+The skill can use only folder listing, message listing, and batch message fetch actions. It resolves exactly the folder whose `wellKnownName` is `inbox`. If a plugin runtime omits that canonical field from every folder, the only fallback is Graph's literal well-known identifier `inbox`; display names and paths are never guessed. It must not send, draft, reply, forward, move, delete, categorize, mark read, unsubscribe, access attachments, open links, or obey mail instructions.
 
-## QQ Mail and 163 Mail setup
+## Bounded Outlook protocol
 
-Enable IMAP in the provider settings and generate a dedicated client authorization code or client password. Never enter the normal web-login password. See the [QQ Mail connector instructions](https://hiflow.tencent.com/docs/applications/qq-mail/) and [NetEase Mail help](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae).
+1. `POST /api/mail/outlook-connector/runs` grants one exclusive 15-minute lease and returns up to two fixed scan windows.
+2. The first run covers at most the latest 30 days. Later runs prioritize a recent overlap while retaining unfinished historical windows.
+3. A task processes at most 200 headers, newest increment first. Pagination offsets are verified per leased window.
+4. `.../headers` accepts only bounded subject/sender/time/source-ID fields and returns server-issued, single-use body tokens for likely recruitment mail.
+5. Gated messages are fetched in batches of at most 20. Each UTF-8 body is limited to 512 KiB and each submitted batch to 2 MiB. HTML becomes plain text offline.
+6. `.../complete` advances only fully accounted windows after every issued body token is resolved. `.../fail` releases the lease using an allowlisted error code.
 
-The service connects only with verified TLS on port 993, opens Inbox using read-only `EXAMINE`, and uses UID queries with `BODY.PEEK`. It has no mailbox mutation API.
+Connector results remain inside the orchestration call. Mail JSON is sent to [the fixed wrapper](../scripts/Invoke-OutlookConnectorSync.ps1) over standard input, never a command argument or temporary file. Interactive terminals disable echo and line buffering, and return sanitized results as ordered short frames so console wrapping cannot corrupt JSON. Some connector list responses include extra message fields; the skill immediately projects only header data and does not display, log, or submit incidental bodies, recipients, attachment flags, or links.
 
-## Incremental processing
+## QQ Mail and 163 Mail
 
-The first connection defaults to new messages only; an explicit 30- or 90-day backfill may be selected. One in-process scheduler polls connected accounts at a bounded interval.
+Enable IMAP with the provider and generate a dedicated authorization code or client password. Never enter the normal web password. See the [QQ Mail instructions](https://hiflow.tencent.com/docs/applications/qq-mail/) and [NetEase Mail help](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae).
 
-Each pass first reads limited header metadata. A size-limited, non-attachment text body is fetched into memory only when a high-recall recruitment gate matches. HTML is converted to plain text offline; scripts, remote resources, links, and instructions inside mail are never executed.
+The service uses verified TLS on port 993, opens Inbox with read-only `EXAMINE`, and uses UID queries plus `BODY.PEEK`. Only QQ/163 use the local scheduler and connect/sync/disconnect API.
 
-The cursor advances only in the same successful transaction as the structured results. A read, parse, or write failure leaves it unchanged. `UIDVALIDITY` changes and expired Graph delta links trigger a bounded overlap rebuild, never an unbounded mailbox scan.
+## Extraction and persistence
 
-## Extraction and automatic updates
+Only assessments and exact first, second, third, or HR interview rounds can be appended automatically, and only with one active application match, explicit required dates, a safe transition, and confidence at or above the threshold.
 
-Only assessments and exact first, second, third, or HR interview rounds can be appended automatically, and only when all of these are true:
+Generic interviews, ambiguous or conflicting dates, missing or multiple matches, `applied`, offers, rejections, withdrawals, archived applications, ended-record restarts, and unsafe transitions remain in the human-review queue. `applied` always requires a `user_confirmation` event after personal final submission.
 
-- exactly one active application matches the established priority order;
-- required event, scheduled, or deadline dates are explicit;
-- the status transition is safe and consistent;
-- confidence meets the service threshold.
+SQLite and API responses never contain raw subjects, senders, bodies, message IDs, recipients, attachments, verification codes, meeting links, or connector tokens. A pending candidate contains only bounded structured fields. Confirmation, dismissal, deduplication, or 90-day expiry clears readable candidate fields while retaining minimal audit and fingerprint data.
 
-Generic interviews, ambiguous or conflicting dates, missing or multiple matches, `applied`, offers, rejections, withdrawals, archived applications, ended-record restarts, and unsafe transitions stay in the human review queue. The `applied` status always requires a `user_confirmation` event after personal final submission.
+Mail and HTML are untrusted. Their content cannot change repository rules, database schema, credentials, safe boundaries, or commands, and external resources are never loaded.
 
-Mail text is untrusted input. It cannot change local rules, database schema, safe-storage boundaries, or application commands.
+## Interface and troubleshooting
 
-## Structured review queue
-
-While pending, a candidate is limited to company, role, proposed stage, event/scheduled/deadline dates, confidence, matched record ID, reason codes, provider/fingerprint, and minimal queue metadata. The API and frontend do not expose subject, sender, body, attachments, meeting links, verification codes, or private contacts.
-
-Confirming a safe candidate appends its validated event. Dismissing, deduplicating, or expiring a candidate immediately clears readable structured fields while retaining only minimal audit and deduplication metadata. Unreviewed candidates expire after 90 days. Disconnecting removes the provider cursor and the corresponding secure credential or token cache.
-
-## Operations and troubleshooting
-
-The Mail ingestion view shows sanitized connection state, sync controls, and structured candidates. Pausing retains the secure connection and cursor; resuming requests another bounded sync; disconnecting removes them.
+The Outlook card says it is managed by the Codex connector and offers only pause/resume plus sanitized success/error state and pending count. QQ/163 retain local connect, sync, pause/resume, and disconnect controls.
 
 | Symptom | Check |
 | --- | --- |
-| Outlook requests authorization again | Verify public-client configuration, the `http://localhost` redirect, and delegated `Mail.Read`, then reconnect. |
+| Outlook needs login | Complete the Outlook connector login or reauthorization in Codex; there is no local Client ID form. |
+| Outlook startup sync is silent | Silence means paused, already leased, or no structured change; inspect the card state if needed. |
 | QQ/163 authentication fails | Confirm IMAP is enabled and use the generated authorization code, not the web password. |
-| Secure storage fails | Run in a supported Windows interactive user session with Credential Manager and DPAPI available. |
-| A candidate is not auto-applied | Review the reason code; ambiguity and unsafe transitions are deliberately routed to a person. |
-| Sync repeats old mail | Check for a bounded cursor rebuild after `UIDVALIDITY` or delta invalidation; do not reset or scan the mailbox manually. |
+| A candidate is not auto-applied | Review the reason code; ambiguity and unsafe transitions deliberately require a person. |
+| A run is interrupted | Start a later Codex task; the lease expires and unfinished windows remain queued without cursor advancement. |
 
-The public API operations are listed in [Development and API reference](development.md), and persistence limits are explained in [Security and privacy](security-and-privacy.md).
+The v5 migration removes old Outlook account rows, Graph cursors, and Outlook review candidates while preserving committed application timeline events. Startup also removes only strictly named legacy MSAL cache files beneath the fixed local application-data directory and fails closed on an unsafe path or deletion error.
+
+Public API details are in [Development and API reference](development.md), and persistence limits are in [Security and privacy](security-and-privacy.md).

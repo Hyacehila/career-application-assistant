@@ -39,7 +39,7 @@ pnpm --dir app\frontend build
 {
   "status": "ok",
   "database": "available",
-  "schema_version": 3,
+  "schema_version": 5,
   "service": "career-application-assistant",
   "mode": "standard",
   "synthetic_data": false,
@@ -66,12 +66,17 @@ pnpm --dir app\frontend build
 | `POST` | `/api/agent/fill-completed` | 幂等记录已准备表单为待复核 |
 | `POST` | `/api/agent/status-update` | 唯一匹配活动记录并追加结构化事件 |
 | `GET` | `/api/mail/accounts` | 脱敏的服务商状态与待复核数量 |
-| `POST` | `/api/mail/accounts/{provider}/connect` | 启动 Outlook 授权或校验并保存 IMAP 授权码 |
-| `POST` | `/api/mail/accounts/{provider}/sync` | 启动一次有界增量读取 |
-| `POST` | `/api/mail/accounts/{provider}/pause` | 暂停轮询并保留安全状态 |
-| `POST` | `/api/mail/accounts/{provider}/resume` | 恢复轮询并请求同步 |
-| `DELETE` | `/api/mail/accounts/{provider}` | 删除游标与安全凭据/令牌状态 |
-| `GET` | `/api/mail/operations/{id}` | 查询脱敏的连接/同步操作 |
+| `POST` | `/api/mail/accounts/{provider}/connect` | 仅 QQ/163：校验并保存 IMAP 授权码 |
+| `POST` | `/api/mail/accounts/{provider}/sync` | 仅 QQ/163：启动一次有界增量读取 |
+| `POST` | `/api/mail/accounts/{provider}/pause` | 暂停 IMAP 轮询或 Outlook 新任务同步 |
+| `POST` | `/api/mail/accounts/{provider}/resume` | 恢复 IMAP 轮询或 Outlook 新任务同步 |
+| `DELETE` | `/api/mail/accounts/{provider}` | 仅 QQ/163：删除游标与安全凭据状态 |
+| `GET` | `/api/mail/operations/{id}` | 查询脱敏的 QQ/163 连接/同步操作 |
+| `POST` | `/api/mail/outlook-connector/runs` | 申请一次有界的 15 分钟连接器租约与扫描计划 |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/headers` | 门控一页已校验 Inbox 邮件头并签发正文 token |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/messages` | 将最多 20 封已门控正文解析为结构化结果 |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/complete` | 提交已完整处理的窗口进度 |
+| `POST` | `/api/mail/outlook-connector/runs/{id}/fail` | 使用白名单脱敏错误码释放运行 |
 | `GET` | `/api/mail/candidates` | 返回不含原始邮件字段的结构化候选 |
 | `POST` | `/api/mail/candidates/{id}/confirm` | 校验并追加人工确认的候选事件 |
 | `POST` | `/api/mail/candidates/{id}/dismiss` | 忽略并清除候选字段 |
@@ -114,7 +119,7 @@ pwsh -NoProfile -File .\scripts\Test-PublicRelease.ps1 -PolicySelfTest
 git diff --check
 ```
 
-邮件单元测试使用确定性的 Graph/IMAP 替身，不需要真实账号。可选的无认证冒烟检查只能建立到 `imap.qq.com:993` 与 `imap.163.com:993` 的 TLS 连接，不得发送凭据，也不是必需单元测试的一部分。
+邮件单元测试使用模拟连接器输出和确定性的 IMAP 替身。最终本机验收可在用户完成连接器认证后执行一次真实 Outlook 只读冒烟同步，只核对结构化计数和状态。可选的 IMAP 无认证冒烟检查只能建立到 `imap.qq.com:993` 与 `imap.163.com:993` 的 TLS 连接，不得发送凭据。
 
 ## Windows CI
 

@@ -91,7 +91,7 @@ def test_demo_health_seed_and_route_surface(demo_client: TestClient) -> None:
     assert health.json() == {
         "status": "ok",
         "database": "available",
-        "schema_version": 4,
+        "schema_version": 5,
         "service": "career-application-assistant",
         "mode": "demo",
         "synthetic_data": True,
@@ -216,7 +216,6 @@ def test_demo_factory_never_constructs_mail_or_secure_storage(
 
     monkeypatch.setattr(service, "MailService", forbidden)
     monkeypatch.setattr(credentials, "WindowsCredentialStore", forbidden)
-    monkeypatch.setattr(credentials, "create_dpapi_token_cache", forbidden)
 
     demo_app = create_demo_app(demo_paths)
     assert not hasattr(demo_app.state, "mail_service")

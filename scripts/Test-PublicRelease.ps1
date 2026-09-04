@@ -48,7 +48,8 @@ $githubFiles = @(
 )
 
 $skillFiles = @(
-    '.agents/skills/job-discovery/SKILL.md'
+    '.agents/skills/job-discovery/SKILL.md',
+    '.agents/skills/outlook-recruitment-sync/SKILL.md'
 )
 
 $publicScreenshotFiles = @(

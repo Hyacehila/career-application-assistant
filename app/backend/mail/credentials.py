@@ -1,8 +1,8 @@
-"""Windows-only credential and encrypted MSAL cache helpers.
+"""Windows Credential Manager helpers for IMAP authorization codes.
 
 This module deliberately imports optional Windows dependencies lazily.  The
-mail feature must fail closed when Windows Credential Manager or DPAPI cannot
-be used; it must never fall back to a plaintext file or an in-memory cache in
+mail feature must fail closed when Windows Credential Manager cannot be used;
+it must never fall back to a plaintext file or an in-memory cache in
 production.
 """
 
@@ -11,10 +11,8 @@ from __future__ import annotations
 import base64
 import binascii
 import importlib
-import os
 import sys
 from dataclasses import dataclass
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -187,55 +185,6 @@ def _decode_credential_value(blob: object) -> str:
     return raw.decode("utf-8")
 
 
-def default_msal_cache_path(*, environ: dict[str, str] | None = None) -> Path:
-    """Return a cache path under LocalAppData without a plaintext fallback."""
-
-    variables = os.environ if environ is None else environ
-    local_app_data = variables.get("LOCALAPPDATA")
-    if not local_app_data:
-        raise SecureStorageUnavailable("LOCALAPPDATA is unavailable.")
-    return Path(local_app_data) / APPLICATION_NAME / "auth" / "msal.cache"
-
-
-def create_dpapi_token_cache(
-    cache_path: str | Path | None = None,
-    *,
-    extensions_module: ModuleType | Any | None = None,
-    platform: str | None = None,
-) -> Any:
-    """Create a DPAPI-encrypted, lock-aware MSAL token cache.
-
-    ``FilePersistenceWithDataProtection`` is selected explicitly.  In
-    particular, this helper does not call a generic persistence builder that
-    could choose a plaintext implementation on another platform.
-    """
-
-    if not _is_windows(platform):
-        raise SecureStorageUnavailable("Windows DPAPI is required for Outlook tokens.")
-    module = extensions_module or _load_optional_module("msal_extensions")
-    persistence_type = getattr(module, "FilePersistenceWithDataProtection", None)
-    cache_type = getattr(module, "PersistedTokenCache", None)
-    if persistence_type is None or cache_type is None:
-        raise SecureStorageUnavailable("DPAPI token-cache support is unavailable.")
-
-    location = Path(cache_path) if cache_path is not None else default_msal_cache_path()
-    try:
-        location.parent.mkdir(parents=True, exist_ok=True)
-        persistence = persistence_type(str(location))
-        # Eagerly probe availability where supported.  The implementation
-        # normally exposes this as a boolean property.
-        available = getattr(persistence, "is_available", True)
-        if callable(available):
-            available = available()
-        if available is False:
-            raise SecureStorageUnavailable("Windows DPAPI is unavailable.")
-        return cache_type(persistence)
-    except SecureStorageUnavailable:
-        raise
-    except Exception as exc:
-        raise SecureStorageUnavailable("Could not initialize the encrypted token cache.") from exc
-
-
 __all__ = [
     "APPLICATION_NAME",
     "CredentialNotFound",
@@ -244,7 +193,5 @@ __all__ = [
     "SecureStorageUnavailable",
     "StoredCredential",
     "WindowsCredentialStore",
-    "create_dpapi_token_cache",
     "credential_target",
-    "default_msal_cache_path",
 ]

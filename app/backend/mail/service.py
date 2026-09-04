@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -24,19 +21,6 @@ from .credentials import (
     CredentialStoreError,
     SecureStorageUnavailable,
     WindowsCredentialStore,
-    default_msal_cache_path,
-)
-from .graph import (
-    GraphAuthenticationRequired,
-    GraphCursorExpired,
-    GraphError,
-    GraphMailClient,
-    GraphMessageUnavailable,
-    GraphPayloadTooLarge,
-    GraphProtocolError,
-    GraphThrottled,
-    GraphTransientError,
-    OutlookAuth,
 )
 from .imap import ImapConnector, ImapConnectorError, ImapCursor
 from .schemas import (
@@ -44,16 +28,12 @@ from .schemas import (
     ImapConnectRequest,
     MailAccountOut,
     MailOperationOut,
-    OutlookConnectRequest,
 )
 
 LOGGER = logging.getLogger("board.mail")
 POLL_MINUTES = 5
 BACKOFF_MINUTES = (5, 15, 30, 60)
 MAX_CURSOR_REBUILD_DAYS = 90
-OUTLOOK_STAGING_CACHE_RE = re.compile(
-    r"^msal\.[0-9a-f]{32}\.(?:cache|backup)(?:\.lockfile)?$"
-)
 
 
 class MailServiceError(RuntimeError):
@@ -93,23 +73,12 @@ class MailService:
         *,
         scheduler_enabled: bool = True,
         credential_store_factory: Callable[[], Any] = WindowsCredentialStore,
-        outlook_auth_factory: Callable[..., Any] = OutlookAuth,
-        graph_client_factory: Callable[..., Any] = GraphMailClient,
         imap_connector_factory: Callable[..., Any] = ImapConnector,
-        outlook_cache_path_factory: Callable[[], Path] | None = None,
     ) -> None:
         self.paths = paths
         self.scheduler_enabled = scheduler_enabled
         self._credential_store_factory = credential_store_factory
-        self._outlook_auth_factory = outlook_auth_factory
-        self._graph_client_factory = graph_client_factory
         self._imap_connector_factory = imap_connector_factory
-        self._outlook_cache_path_factory = (
-            outlook_cache_path_factory or default_msal_cache_path
-        )
-        self._outlook_startup_cleanup_enabled = (
-            scheduler_enabled or outlook_cache_path_factory is not None
-        )
         self._scheduler: Any | None = None
         self._operations: dict[str, _Operation] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
@@ -130,11 +99,6 @@ class MailService:
             store.expire_pending_candidates(connection)
         for provider in ("qq", "163"):
             await self._cleanup_stale_imap_credentials(provider)
-        if self._outlook_startup_cleanup_enabled:
-            try:
-                await asyncio.to_thread(self._cleanup_outlook_staging_cache)
-            except SecureStorageUnavailable:
-                LOGGER.warning("mail_outlook_staging_cleanup_failed")
         if not self.scheduler_enabled:
             return
         try:
@@ -170,9 +134,7 @@ class MailService:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    def start_connect(
-        self, provider: str, payload: OutlookConnectRequest | ImapConnectRequest
-    ) -> MailOperationOut:
+    def start_connect(self, provider: str, payload: ImapConnectRequest) -> MailOperationOut:
         return self._start_operation(provider, "connect", lambda: self._connect(provider, payload))
 
     def start_sync(self, provider: str) -> MailOperationOut:
@@ -302,17 +264,14 @@ class MailService:
         with application_store.open_connection_tx(self.paths) as connection:
             account = store.ensure_account(connection, provider)
         try:
-            if provider == "outlook":
-                await asyncio.to_thread(self._delete_outlook_cache)
-            else:
-                credential_store = self._credential_store_factory()
-                refs = _unique_refs(
-                    account.get("pending_credential_ref"),
-                    account.get("previous_credential_ref"),
-                    account.get("credential_ref"),
-                )
-                for credential_ref in refs:
-                    await asyncio.to_thread(credential_store.delete, credential_ref)
+            credential_store = self._credential_store_factory()
+            refs = _unique_refs(
+                account.get("pending_credential_ref"),
+                account.get("previous_credential_ref"),
+                account.get("credential_ref"),
+            )
+            for credential_ref in refs:
+                await asyncio.to_thread(credential_store.delete, credential_ref)
         except CredentialStoreError as exc:
             error = self._safe_error(exc)
             raise ApiError(
@@ -332,20 +291,13 @@ class MailService:
         if account is None or account["status"] == "disconnected":
             return None
         try:
-            if provider == "outlook":
-                client_id = account.get("public_client_id")
-                if not client_id:
-                    return None
-                auth = await asyncio.to_thread(self._outlook_auth_factory, client_id)
-                username = await asyncio.to_thread(auth.account_username)
-            else:
-                credential_ref = account.get("credential_ref")
-                if not credential_ref:
-                    return None
-                credential = await asyncio.to_thread(
-                    self._credential_store_factory().read, credential_ref
-                )
-                username = credential.username
+            credential_ref = account.get("credential_ref")
+            if not credential_ref:
+                return None
+            credential = await asyncio.to_thread(
+                self._credential_store_factory().read, credential_ref
+            )
+            username = credential.username
         except Exception:
             return None
         return _mask_mailbox(username)
@@ -397,14 +349,15 @@ class MailService:
         try:
             count = int(
                 connection.execute(
-                    "SELECT count(*) FROM mail_event_candidates WHERE account_id = ? AND state = 'pending'",
-                    (row["id"],),
+                    "SELECT count(*) FROM mail_event_candidates WHERE provider = ? AND state = 'pending'",
+                    (row["provider"],),
                 ).fetchone()[0]
             )
         finally:
             connection.close()
         return MailAccountOut(
             provider=row["provider"],
+            connection_mode="local_imap",
             status=row["status"],
             masked_address=await self.masked_address(row["provider"]),
             history_window=row.get("history_window") or "new_only",
@@ -415,13 +368,8 @@ class MailService:
             pending_count=count,
         )
 
-    async def _connect(
-        self, provider: str, payload: OutlookConnectRequest | ImapConnectRequest
-    ) -> None:
-        if provider in {"qq", "163"}:
-            await self._cleanup_stale_imap_credentials(provider, fail_closed=True)
-        elif provider == "outlook":
-            await asyncio.to_thread(self._cleanup_outlook_staging_cache)
+    async def _connect(self, provider: str, payload: ImapConnectRequest) -> None:
+        await self._cleanup_stale_imap_credentials(provider, fail_closed=True)
         with application_store.open_connection_tx(self.paths) as connection:
             previous = store.ensure_account(connection, provider)
             store.update_account(
@@ -432,14 +380,7 @@ class MailService:
                 next_retry_at=None,
             )
         try:
-            if provider == "outlook":
-                if not isinstance(payload, OutlookConnectRequest):
-                    raise validation_error("Outlook connect payload is invalid.")
-                await self._connect_outlook(previous, payload)
-            else:
-                if not isinstance(payload, ImapConnectRequest):
-                    raise validation_error("IMAP connect payload is invalid.")
-                await self._connect_imap(previous, provider, payload)
+            await self._connect_imap(previous, provider, payload)
         except (Exception, asyncio.CancelledError):
             with application_store.open_connection_tx(self.paths) as connection:
                 current = store.get_account(connection, provider)
@@ -454,103 +395,6 @@ class MailService:
                         error_code="connect_failed",
                     )
             raise
-
-    async def _connect_outlook(self, account: dict, payload: OutlookConnectRequest) -> None:
-        default_path = self._outlook_cache_path_factory()
-        temp_path = default_path.with_name(f"msal.{uuid4().hex}.cache")
-        backup_path = default_path.with_name(f"msal.{uuid4().hex}.backup")
-        new_generation = str(uuid4())
-        deferred_cleanup = False
-        try:
-            auth = await asyncio.to_thread(
-                self._outlook_auth_factory,
-                payload.client_id,
-                cache_path=temp_path,
-            )
-            auth_task = asyncio.create_task(
-                asyncio.to_thread(auth.acquire_interactive, timeout=300)
-            )
-            try:
-                token = await asyncio.wait_for(asyncio.shield(auth_task), timeout=310)
-            except (TimeoutError, asyncio.CancelledError):
-                if not auth_task.done():
-                    _defer_cache_cleanup(auth_task, temp_path)
-                    deferred_cleanup = True
-                raise
-            username = await asyncio.to_thread(auth.account_username)
-            if not username:
-                raise MailServiceError("outlook_account_missing", auth_required=True)
-            first_token = token
-
-            def token_provider() -> str:
-                nonlocal first_token
-                if first_token:
-                    current, first_token = first_token, ""
-                    return current
-                return auth.acquire_silent()
-
-            result, extractions = await asyncio.to_thread(
-                self._read_graph_round,
-                token_provider,
-                None,
-                _history_since(payload.history_window),
-            )
-            if not temp_path.is_file():
-                raise SecureStorageUnavailable("Encrypted Outlook cache was not created.")
-            default_path.parent.mkdir(parents=True, exist_ok=True)
-            had_previous_cache = default_path.is_file()
-            if had_previous_cache:
-                os.replace(default_path, backup_path)
-            try:
-                os.replace(temp_path, default_path)
-                with application_store.open_connection_tx(self.paths) as connection:
-                    connection.execute(
-                        "DELETE FROM mail_sync_cursors WHERE account_id = ?", (account["id"],)
-                    )
-                    self._persist_extractions(
-                        connection,
-                        account,
-                        "outlook",
-                        extractions,
-                        generation=new_generation,
-                    )
-                    store.save_graph_cursor(
-                        connection,
-                        account["id"],
-                        result.delta_link,
-                        _history_since(payload.history_window).isoformat(),
-                    )
-                    store.update_account(
-                        connection,
-                        "outlook",
-                        status="connected",
-                        history_window=payload.history_window,
-                        public_client_id=payload.client_id,
-                        error_code=None,
-                        last_attempt=True,
-                        last_success=True,
-                        next_retry_at=None,
-                        connection_generation=new_generation,
-                    )
-            except Exception:
-                try:
-                    _unlink_secure(default_path)
-                    if had_previous_cache:
-                        os.replace(backup_path, default_path)
-                except (OSError, SecureStorageUnavailable) as exc:
-                    raise SecureStorageUnavailable(
-                        "Could not restore the previous encrypted Outlook cache."
-                    ) from exc
-                raise
-            if had_previous_cache:
-                # The transaction context commits while it exits.  Keep the
-                # previous encrypted cache until that boundary has succeeded,
-                # otherwise a commit failure would make rollback impossible.
-                _unlink_secure(backup_path)
-        finally:
-            if not deferred_cleanup:
-                _safe_unlink(temp_path)
-                _safe_unlink(_lock_path(temp_path))
 
     async def _connect_imap(
         self,
@@ -658,10 +502,7 @@ class MailService:
             original_status = account["status"]
             store.update_account(connection, provider, status=original_status, last_attempt=True)
             cursor = store.get_cursor(connection, account["id"])
-        if provider == "outlook":
-            await self._sync_outlook(account, cursor)
-        else:
-            await self._sync_imap(account, cursor)
+        await self._sync_imap(account, cursor)
         with application_store.open_connection_tx(self.paths) as connection:
             current = store.get_account(connection, provider)
             final_status = (
@@ -678,68 +519,6 @@ class MailService:
                 last_success=True,
                 next_retry_at=None,
             )
-
-    async def _sync_outlook(self, account: dict, cursor: dict | None) -> None:
-        client_id = account.get("public_client_id")
-        if not client_id:
-            raise MailServiceError("outlook_client_id_missing", auth_required=True)
-        auth = await asyncio.to_thread(self._outlook_auth_factory, client_id)
-        delta_link = cursor.get("graph_delta_link") if cursor else None
-        since = None if delta_link else _history_since(account["history_window"])
-        try:
-            result, extractions = await asyncio.to_thread(
-                self._read_graph_round, auth.acquire_silent, delta_link, since
-            )
-        except GraphCursorExpired:
-            since = _overlap_since(account.get("last_success_at"))
-            result, extractions = await asyncio.to_thread(
-                self._read_graph_round, auth.acquire_silent, None, since
-            )
-        with application_store.open_connection_tx(self.paths) as connection:
-            self._persist_extractions(connection, account, "outlook", extractions)
-            store.save_graph_cursor(
-                connection,
-                account["id"],
-                result.delta_link,
-                since.isoformat() if since else (cursor or {}).get("initial_cutoff_at"),
-            )
-
-    def _read_graph_round(
-        self,
-        token_provider: Callable[[], str],
-        delta_link: str | None,
-        since: datetime | None,
-    ) -> tuple[Any, list[tuple[str, dict[str, Any]]]]:
-        extractions: list[tuple[str, dict[str, Any]]] = []
-        with self._graph_client_factory(token_provider) as client:
-            result = client.fetch_delta(delta_link=delta_link, since=since)
-            for header in result.messages:
-                sender = " ".join(
-                    item for item in (header.sender_name, header.sender_address) if item
-                )
-                if not is_likely_recruitment_header(header.subject, sender):
-                    continue
-                extra_reasons: list[str] = []
-                try:
-                    body = client.fetch_unique_body(header.message_id).text
-                except GraphPayloadTooLarge:
-                    body = ""
-                    extra_reasons.append("body_too_large")
-                except (GraphMessageUnavailable, GraphProtocolError):
-                    body = ""
-                    extra_reasons.append("body_missing")
-                extracted = classify_and_extract(
-                    subject=header.subject,
-                    sender=sender,
-                    received_at=header.received_at,
-                    body=body,
-                )
-                if extracted.negative_signal:
-                    continue
-                mapping = _extraction_mapping(extracted, extra_reasons)
-                extractions.append((header.message_id, mapping))
-                del body, extracted
-        return result, extractions
 
     async def _sync_imap(self, account: dict, cursor: dict | None) -> None:
         credential_ref = account.get("credential_ref")
@@ -895,10 +674,10 @@ class MailService:
         for source_key, extracted in extractions:
             store.create_candidate(
                 connection,
-                account_id=account["id"],
                 provider=provider,
                 source_key=f"{namespace}:{source_key}",
                 extracted=extracted,
+                fingerprint_scope=account["id"],
             )
 
     async def _record_failure(self, provider: str, error: MailServiceError) -> None:
@@ -931,20 +710,6 @@ class MailService:
     def _safe_error(exc: Exception) -> MailServiceError:
         if isinstance(exc, MailServiceError):
             return exc
-        if isinstance(exc, GraphAuthenticationRequired):
-            return MailServiceError("outlook_reauth_required", auth_required=True)
-        if isinstance(exc, GraphThrottled):
-            return MailServiceError("outlook_rate_limited", retry_after=exc.retry_after)
-        if isinstance(exc, GraphCursorExpired):
-            return MailServiceError("outlook_cursor_expired")
-        if isinstance(exc, GraphPayloadTooLarge):
-            return MailServiceError("outlook_backfill_limit")
-        if isinstance(exc, GraphTransientError):
-            return MailServiceError("outlook_network_error")
-        if isinstance(exc, GraphProtocolError):
-            return MailServiceError("outlook_protocol_error")
-        if isinstance(exc, GraphError):
-            return MailServiceError("outlook_request_failed")
         if isinstance(exc, CredentialNotFound):
             return MailServiceError("credential_missing", auth_required=True)
         if isinstance(exc, SecureStorageUnavailable):
@@ -961,27 +726,6 @@ class MailService:
         if isinstance(exc, ApiError):
             return MailServiceError(exc.code)
         return MailServiceError("mail_operation_failed")
-
-    def _cleanup_outlook_staging_cache(self) -> None:
-        path = self._outlook_cache_path_factory()
-        try:
-            siblings = list(path.parent.iterdir()) if path.parent.is_dir() else []
-        except OSError as exc:
-            raise SecureStorageUnavailable(
-                "Could not inspect encrypted Outlook cache files."
-            ) from exc
-        for sibling in siblings:
-            if OUTLOOK_STAGING_CACHE_RE.fullmatch(sibling.name):
-                _unlink_secure(sibling)
-
-    def _delete_outlook_cache(self) -> None:
-        path = self._outlook_cache_path_factory()
-        self._cleanup_outlook_staging_cache()
-        # Keep the active cache until every known orphan has been removed.  If
-        # any deletion fails, disconnect remains uncommitted and the currently
-        # connected account can still authenticate.
-        _unlink_secure(_lock_path(path))
-        _unlink_secure(path)
 
 
 def _extraction_mapping(extracted: Any, extra_reasons: list[str]) -> dict[str, Any]:
@@ -1049,36 +793,6 @@ def _unique_refs(*values: object) -> list[str]:
         if isinstance(value, str) and value and value not in result:
             result.append(value)
     return result
-
-
-def _lock_path(path: Path) -> Path:
-    return Path(f"{path}.lockfile")
-
-
-def _safe_unlink(path: Path) -> None:
-    try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-
-def _unlink_secure(path: Path) -> None:
-    try:
-        path.unlink(missing_ok=True)
-    except OSError as exc:
-        raise SecureStorageUnavailable("Could not delete an encrypted Outlook cache.") from exc
-
-
-def _defer_cache_cleanup(task: asyncio.Task[Any], path: Path) -> None:
-    def cleanup(_task: asyncio.Task[Any]) -> None:
-        try:
-            _task.exception()
-        except (asyncio.CancelledError, Exception):
-            pass
-        _safe_unlink(path)
-        _safe_unlink(_lock_path(path))
-
-    task.add_done_callback(cleanup)
 
 
 __all__ = ["MailService", "MailServiceError"]

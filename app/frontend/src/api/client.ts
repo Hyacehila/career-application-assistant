@@ -122,6 +122,8 @@ export interface DemoResetResponse {
 }
 
 export type MailProvider = 'outlook' | 'qq' | '163'
+export type LocalImapProvider = Exclude<MailProvider, 'outlook'>
+export type MailConnectionMode = 'codex_connector' | 'local_imap'
 export type HistoryWindow = 'new_only' | 'last_30_days' | 'last_90_days'
 export type MailAccountStatus =
   | 'disconnected'
@@ -133,6 +135,7 @@ export type MailAccountStatus =
 
 export interface MailAccount {
   provider: MailProvider
+  connection_mode: MailConnectionMode
   status: MailAccountStatus
   masked_address: string | null
   history_window: HistoryWindow
@@ -202,18 +205,13 @@ export interface MailCandidatesResponse {
   total: number
 }
 
-export interface ConnectOutlookPayload {
-  client_id: string
-  history_window: HistoryWindow
-}
-
 export interface ConnectImapPayload {
   mailbox_address: string
   authorization_code: string
   history_window: HistoryWindow
 }
 
-export type ConnectMailPayload = ConnectOutlookPayload | ConnectImapPayload
+export type ConnectMailPayload = ConnectImapPayload
 
 export interface ConfirmMailCandidatePayload {
   application_id: number
@@ -449,7 +447,7 @@ export function listMailAccounts(signal?: AbortSignal): Promise<MailAccountsResp
 }
 
 export function connectMailAccount(
-  provider: MailProvider,
+  provider: LocalImapProvider,
   body: ConnectMailPayload,
   signal?: AbortSignal,
 ): Promise<MailOperationAccepted> {
@@ -464,7 +462,7 @@ export function getMailOperation(id: string, signal?: AbortSignal): Promise<Mail
   return request(`/mail/operations/${encodeURIComponent(id)}`, { method: 'GET' }, signal)
 }
 
-export function syncMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<MailOperationAccepted> {
+export function syncMailAccount(provider: LocalImapProvider, signal?: AbortSignal): Promise<MailOperationAccepted> {
   return request(`/mail/accounts/${providerSegment(provider)}/sync`, { method: 'POST', body: '{}' }, signal)
 }
 
@@ -476,7 +474,7 @@ export function resumeMailAccount(provider: MailProvider, signal?: AbortSignal):
   return request(`/mail/accounts/${providerSegment(provider)}/resume`, { method: 'POST', body: '{}' }, signal)
 }
 
-export function disconnectMailAccount(provider: MailProvider, signal?: AbortSignal): Promise<void> {
+export function disconnectMailAccount(provider: LocalImapProvider, signal?: AbortSignal): Promise<void> {
   return request(`/mail/accounts/${providerSegment(provider)}`, { method: 'DELETE' }, signal)
 }
 

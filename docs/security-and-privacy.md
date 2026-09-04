@@ -44,9 +44,9 @@ Status changes are append-only events. `applied` requires `user_confirmation`; f
 
 ## Mail credentials and content
 
-QQ/163 authorization codes are stored only in Windows Credential Manager under opaque account targets. Outlook's MSAL cache is encrypted with Windows DPAPI under local application data. These values are not written to SQLite, logs, configuration, or `private/`. Secure-storage failures are closed failures, never plaintext fallbacks.
+QQ/163 authorization codes are stored only in Windows Credential Manager under opaque account targets. Outlook authentication is managed by the Codex Outlook Email connector; the local service has no Outlook Client ID, access token, refresh token, or cache. These values are not written to SQLite, logs, configuration, or `private/`. IMAP secure-storage failures are closed failures, never plaintext fallbacks.
 
-Mail is read incrementally and read-only. Raw subject, sender, body, attachment, private contact, verification code, and meeting link fields are not returned by the API or kept in the review queue. See [Mail ingestion](mail-ingestion.md) for provider and retention details.
+Mail is read incrementally and read-only. Outlook connector data is passed to the fixed local wrapper over standard input; raw subject, sender, body, message ID, attachment, private contact, verification code, meeting link, and connector token fields are not returned by the API or kept in the review queue. See [Mail ingestion](mail-ingestion.md) for provider and retention details.
 
 ## Public-release checks
 

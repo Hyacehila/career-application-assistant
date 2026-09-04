@@ -2,69 +2,65 @@
 
 [English](mail-ingestion.md) | 简体中文
 
-邮件接入是正式模式中可选的只读后台能力，不是收件箱客户端。Demo 不构造邮件服务，也不挂载 `/api/mail/*`。
+邮件接入是正式模式中的可选只读能力，不是收件箱客户端。Demo 不构造邮件服务，也不挂载 `/api/mail/*`。
 
 ## 支持的服务商
 
-| 服务商 | 连接方式 | 增量游标 | 密钥保存位置 |
+| 服务商 | 连接方式 | 增量状态 | 密钥保存位置 |
 | --- | --- | --- | --- |
-| Outlook / Outlook.com | Microsoft Graph 用户委托 `Mail.Read`，公共客户端授权码流程与 PKCE | Inbox delta link | 本地应用数据目录中由 Windows DPAPI 加密的 MSAL 缓存 |
+| Outlook / Outlook.com | Codex Outlook Email 连接器 | 固定 Inbox 扫描窗口、重叠水位与持久化积压 | 由 Codex 连接器管理；本机不缓存令牌 |
 | QQ 邮箱 | 993 端口 TLS IMAP 与单独生成的授权码 | `UIDVALIDITY` 与最后处理 UID | Windows Credential Manager |
 | 163 邮箱 | 993 端口 TLS IMAP 与客户端授权密码 | `UIDVALIDITY` 与最后处理 UID | Windows Credential Manager |
 
-实现中没有 SMTP、发送、回复、转发、删除、移动、标记已读、附件下载或 webhook。服务商凭据与令牌不会写入 SQLite、配置文件、日志或 `private/`。Windows 安全存储不可用时会连接失败，不会回退到明文。
+本机 Python 服务不再包含 Outlook Graph 客户端、Entra 应用注册、MSAL 依赖、Client ID 或 Outlook 令牌缓存。系统也没有 SMTP、发送、回复、转发、草稿、删除、移动、标记已读、分类、附件下载或 webhook 功能。
 
-## Outlook 设置
+## Outlook 连接器设置
 
-请注册 Microsoft Entra 公共客户端应用。需要支持 Outlook.com 时，应允许个人 Microsoft 账号；将 `http://localhost` 配置为移动/桌面应用重定向 URI，并且只添加用户委托的 `Mail.Read`。本地界面填写公开 Client ID，不使用客户端密钥。
+在 Codex 中连接 Outlook Email，登录或重新授权必须由用户亲自完成。连接器权限保持当前设置；本仓库通过 `AGENTS.md` 与[仓库级 skill](../.agents/skills/outlook-recruitment-sync/SKILL.md)把实际行为收窄为只读。
 
-MSAL 使用 PKCE 完成交互授权，并通过 DPAPI 保护的缓存刷新令牌。Inbox 增量读取遵循 Microsoft Graph [邮件增量查询 API](https://learn.microsoft.com/zh-cn/graph/api/message-delta?view=graph-rest-1.0)。认证实现使用 [MSAL Python](https://github.com/AzureAD/microsoft-authentication-library-for-python)，许可信息见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
+每次在本仓库开启新的 Codex 任务时，skill 会先尝试一次有界同步，再继续处理用户请求。这里没有定时任务或持续后台监听。连接器已暂停、已有有效租约或邮箱没有结构化变化时保持安静；失败只提示脱敏错误码，不阻塞当前任务。
 
-登录、账号恢复、验证码、多因素验证和外部授权必须由用户亲自完成。应用不会读取或填写验证码。
+skill 只能调用列举文件夹、列举邮件和批量取信三个动作，并且只认 `wellKnownName=inbox` 的 Inbox。若插件运行时在全部文件夹上省略该规范字段，只允许改用 Graph 的固定 well-known 标识符 `inbox`，绝不按显示名称或路径猜测。禁止发送、草稿、回复、转发、移动、删除、分类、标记已读、退订、附件访问、打开链接或执行邮件指令。
 
-## QQ 邮箱与 163 邮箱设置
+## Outlook 有界协议
 
-在服务商设置中启用 IMAP，并生成专用客户端授权码或授权密码。不要输入网页版登录密码。可参考 [QQ 邮箱连接说明](https://hiflow.tencent.com/docs/applications/qq-mail/) 与[网易邮箱帮助](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae)。
+1. `POST /api/mail/outlook-connector/runs` 申请 15 分钟独占租约，最多返回两个固定扫描窗口。
+2. 首次最多覆盖最近 30 天；后续优先处理最新重叠窗口，同时保留未完成的历史积压。
+3. 每个任务最多处理 200 封邮件头，最新增量优先；后端逐窗口校验分页偏移。
+4. `.../headers` 只接收有界的主题、发件人、时间和来源 ID，并为疑似招聘邮件签发一次性正文 token。
+5. 正文每批最多 20 封，单封 UTF-8 上限 512 KiB，每个提交批次上限 2 MiB；HTML 只在本机离线转纯文本。
+6. 只有所有已签发正文 token 都处理完，`.../complete` 才能推进完整窗口；`.../fail` 只能用白名单错误码释放租约。
 
-服务只通过 993 端口的校验 TLS 连接，以只读 `EXAMINE` 打开 Inbox，并使用 UID 查询和 `BODY.PEEK`。代码没有邮箱写入接口。
+连接器结果只留在编排调用内部。邮件 JSON 经标准输入送入[固定封装脚本](../scripts/Invoke-OutlookConnectorSync.ps1)，绝不进入命令行参数或临时文件；交互终端会关闭回显与行缓冲，脱敏响应用有序短帧返回，避免控制台换行破坏 JSON。连接器的邮件列表可能附带额外字段；skill 会立即只投影邮件头，不展示、记录或提交顺带返回的正文、收件人、附件标记与链接。
 
-## 增量处理
+## QQ 邮箱与 163 邮箱
 
-首次连接默认只读取新消息，也可以明确选择回溯 30 天或 90 天。单个进程内调度器按有界间隔轮询已连接账号。
+在服务商设置中启用 IMAP，并生成专用授权码或客户端授权密码，不要输入网页版登录密码。可参考 [QQ 邮箱说明](https://hiflow.tencent.com/docs/applications/qq-mail/)与[网易邮箱帮助](https://help.mail.126.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2ed007f2b27412aae)。
 
-每轮先读取有限的头部元数据。只有命中招聘通知高召回规则时，才把有大小限制且不是附件的文本正文读入内存。HTML 只离线转换为纯文本；邮件中的脚本、远程资源、链接和指令都不会被执行。
+服务只通过 993 端口的校验 TLS 连接，以只读 `EXAMINE` 打开 Inbox，并使用 UID 查询和 `BODY.PEEK`。只有 QQ/163 使用本机调度器以及连接、同步和断开 API。
 
-游标只能与本轮结构化结果在同一成功事务中推进。读取、解析或写入失败时保持不变。`UIDVALIDITY` 变化或 Graph delta link 失效时，只做有界重叠窗口重建，不进行无界邮箱扫描。
+## 提取与持久化
 
-## 提取与自动更新
+只有测评和精确的 1 面、2 面、3 面或 HR 面才可能自动追加，而且必须同时满足：唯一匹配活动申请、必需日期明确、状态迁移安全且可信度达到阈值。
 
-只有测评和精确的 1 面、2 面、3 面或 HR 面才可能自动追加，而且必须同时满足：
+泛化面试、日期歧义或冲突、没有匹配或多条匹配、`applied`、Offer、拒绝、撤回、归档申请、已结束记录的新流程和不安全迁移都会留在人工复核队列。`applied` 始终要求用户亲自完成最终提交后产生 `user_confirmation` 事件。
 
-- 按既定优先级唯一匹配到一条活动申请；
-- 必需的事件、计划或截止日期明确；
-- 状态迁移安全且一致；
-- 可信度达到服务阈值。
+SQLite 与 API 响应绝不包含原始主题、发件人、正文、消息 ID、收件人、附件、验证码、会议链接或连接器 token。待复核候选只含有界结构化字段；确认、忽略、去重或 90 天过期后立即清除可读候选字段，只保留最小审计与指纹数据。
 
-泛化面试、日期歧义或冲突、没有匹配或多条匹配、`applied`、Offer、拒绝、撤回、归档申请、已结束记录的新流程和不安全迁移都会留在人工复核队列。`applied` 始终要求用户亲自最终提交后的 `user_confirmation` 事件。
+邮件与 HTML 都是不可信输入，不能改变仓库规则、数据库结构、凭据、安全边界或命令，也不会加载外部资源。
 
-邮件文本是不可信输入，不能改变本地规则、数据库结构、安全存储边界或应用命令。
+## 界面与排错
 
-## 结构化复核队列
-
-候选待复核期间只保留公司、岗位、建议阶段、事件/计划/截止日期、可信度、匹配记录 ID、原因码、服务商/指纹和最小队列元数据。API 与前端不展示主题、发件人、正文、附件、会议链接、验证码或私人联系人。
-
-确认安全候选后追加经过校验的事件。忽略、去重或过期会立即清除可读结构化字段，只保留最小审计与去重元数据。未处理候选在 90 天后过期。断开连接会删除服务商游标及相应安全凭据或令牌缓存。
-
-## 操作与排错
-
-“邮件接入”视图只显示脱敏连接状态、同步控件和结构化候选。暂停会保留安全连接与游标；恢复会请求下一轮有界同步；断开会删除这些内容。
+Outlook 卡片明确显示“由 Codex Outlook 连接器管理”，只提供暂停/恢复，以及脱敏成功时间、错误和待复核数量。QQ/163 继续提供本机连接、同步、暂停/恢复和断开操作。
 
 | 现象 | 检查方法 |
 | --- | --- |
-| Outlook 再次要求授权 | 检查公共客户端、`http://localhost` 重定向和用户委托 `Mail.Read`，再重新连接。 |
+| Outlook 需要登录 | 在 Codex 中完成 Outlook 连接器登录或重新授权；本机不再有 Client ID 表单。 |
+| Outlook 启动同步没有提示 | 静默表示已暂停、已有租约或没有结构化变化；需要时查看卡片状态。 |
 | QQ/163 认证失败 | 确认已开启 IMAP，并使用生成的授权码而不是网页版密码。 |
-| 安全存储失败 | 在 Credential Manager 与 DPAPI 可用的 Windows 交互用户会话中运行。 |
-| 候选未自动写入 | 查看原因码；歧义和不安全迁移会有意交给人工。 |
-| 同步重复旧邮件 | 检查是否发生 `UIDVALIDITY` 或 delta 失效后的有界游标重建；不要手动重置或扫描邮箱。 |
+| 候选未自动写入 | 查看原因码；歧义与不安全迁移会有意交给人工。 |
+| 同步中断 | 后续新建 Codex 任务即可重试；租约过期后恢复，未完成窗口不会推进游标。 |
 
-公开 API 操作见[开发与 API 参考](development.zh-CN.md)，持久化限制见[安全与隐私](security-and-privacy.zh-CN.md)。
+v5 迁移会删除旧 Outlook 账户行、Graph 游标和 Outlook 复核候选，但保留已经提交到申请时间线的事件。启动时还会在固定的本地应用数据目录下，只删除命名严格匹配的旧 MSAL 缓存；路径不安全或删除失败时会中止启动。
+
+公开 API 见[开发与 API 参考](development.zh-CN.md)，持久化限制见[安全与隐私](security-and-privacy.zh-CN.md)。

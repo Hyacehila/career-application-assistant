@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from backend.mail.credentials import (
@@ -9,9 +7,7 @@ from backend.mail.credentials import (
     CredentialValueTooLarge,
     SecureStorageUnavailable,
     WindowsCredentialStore,
-    create_dpapi_token_cache,
     credential_target,
-    default_msal_cache_path,
 )
 
 
@@ -93,54 +89,3 @@ def test_credential_rejects_invalid_target_and_oversized_blob() -> None:
     with pytest.raises(CredentialValueTooLarge):
         store.write("opaque", "person@invalid", "x" * 2561)
     assert backend.writes == []
-
-
-def test_default_cache_path_requires_local_app_data() -> None:
-    with pytest.raises(SecureStorageUnavailable):
-        default_msal_cache_path(environ={})
-    path = default_msal_cache_path(environ={"LOCALAPPDATA": "C:/local"})
-    assert path.as_posix().endswith("CareerApplicationAssistant/auth/msal.cache")
-
-
-def test_dpapi_cache_explicitly_uses_data_protection(tmp_path) -> None:
-    calls: list[tuple[str, object]] = []
-
-    class Persistence:
-        is_available = True
-
-        def __init__(self, location: str) -> None:
-            calls.append(("persistence", location))
-
-    class Cache:
-        def __init__(self, persistence: object) -> None:
-            calls.append(("cache", persistence))
-
-    module = SimpleNamespace(
-        FilePersistenceWithDataProtection=Persistence,
-        PersistedTokenCache=Cache,
-        FilePersistence=lambda _path: pytest.fail("plaintext persistence must not be used"),
-    )
-    result = create_dpapi_token_cache(
-        tmp_path / "nested" / "cache.bin",
-        extensions_module=module,
-        platform="win32",
-    )
-
-    assert isinstance(result, Cache)
-    assert calls[0][0] == "persistence"
-    assert (tmp_path / "nested").is_dir()
-
-
-def test_dpapi_cache_has_no_cross_platform_or_plaintext_fallback(tmp_path) -> None:
-    with pytest.raises(SecureStorageUnavailable):
-        create_dpapi_token_cache(
-            tmp_path / "cache.bin",
-            extensions_module=SimpleNamespace(),
-            platform="linux",
-        )
-    with pytest.raises(SecureStorageUnavailable):
-        create_dpapi_token_cache(
-            tmp_path / "cache.bin",
-            extensions_module=SimpleNamespace(FilePersistence=lambda _: object()),
-            platform="win32",
-        )

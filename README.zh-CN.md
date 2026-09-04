@@ -94,7 +94,7 @@ pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 - 五列看板与详细表格，支持搜索、筛选、排序、分页、响应式布局、详情、下一步事项和软删除。
 - 十个精确状态以追加式、经过校验的时间线事件表示；`applied` 始终要求用户明确确认。
 - 通过类型化 Agent 接口和 PowerShell 封装命令记录已准备的表单与后续状态，无需直接操作 SQLite。
-- 可选的只读增量邮件接入：Outlook 使用 Microsoft Graph，QQ/163 使用 TLS IMAP，并提供结构化人工复核队列。
+- 可选的只读邮件接入：Outlook 使用 Codex Outlook Email 连接器，QQ/163 使用本机 TLS IMAP，并提供结构化人工复核队列。
 - 可编辑、可重置的合成 Demo，无法访问正式数据库、Agent 路由或邮件运行时。
 - 后端、前端、浏览器回归、发布策略和 Windows CI 检查均不需要真实招聘网站或邮箱账号。
 
@@ -102,7 +102,7 @@ pwsh -NoProfile -File .\scripts\Test-Environment.ps1 -Mode Standard
 
 - 候选人资料与投递数据只留在被忽略的本地路径；应用代码、规则、测试与占位模板才进入公开仓库。
 - 正式 API 监听 `127.0.0.1:8000`，Demo 监听 `127.0.0.1:8001`；两者都不支持远程或多用户部署。
-- 邮件接入只读。凭据和令牌使用 Windows Credential Manager 或受 DPAPI 保护的存储，安全存储不可用时失败关闭。
+- 邮件接入只读。Outlook 连接由 Codex 管理；QQ/163 授权码使用 Windows Credential Manager，安全存储不可用时失败关闭。
 - SQLite 只保存岗位元数据与有界的结构化事件，不保存简历内容、表单答案、原始邮件、附件、验证码或会议链接。
 - 公开变更必须按精确路径暂存，并运行 `scripts/Test-PublicRelease.ps1 -Staged`；安全检查失败时不得绕过。
 

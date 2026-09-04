@@ -94,7 +94,7 @@ The initializer is safe to repeat: it creates missing `private/resume_materials.
 - Five-column board and detailed table with search, filters, sorting, pagination, responsive layout, details, next actions, and soft deletion.
 - Ten precise statuses represented as append-only, validated timeline events; `applied` always requires explicit user confirmation.
 - Typed Agent endpoints and a PowerShell wrapper for recording prepared forms and later status updates without direct SQLite access.
-- Optional read-only incremental intake for Outlook through Microsoft Graph and QQ/163 through TLS IMAP, with a structured human-review queue.
+- Optional read-only intake for Outlook through the Codex Outlook Email connector and for QQ/163 through local TLS IMAP, with a structured human-review queue.
 - A synthetic, resettable demo that cannot access the production database, Agent routes, or mail runtime.
 - Backend, frontend, browser-loop, release-policy, and Windows CI checks that do not require live recruitment or mailbox accounts.
 
@@ -102,7 +102,7 @@ The initializer is safe to repeat: it creates missing `private/resume_materials.
 
 - Candidate materials and application data stay in ignored local paths; application code, rules, tests, and placeholders remain public.
 - The standard API binds to `127.0.0.1:8000`; the demo binds to `127.0.0.1:8001`. Neither mode is a supported remote or multi-user deployment.
-- Mail intake is read-only. Credentials and tokens use Windows Credential Manager or DPAPI-backed storage and fail closed if secure storage is unavailable.
+- Mail intake is read-only. Codex manages the Outlook connection; QQ/163 authorization codes use Windows Credential Manager and fail closed if secure storage is unavailable.
 - SQLite stores job metadata and bounded structured events, not resume contents, form answers, raw mail, attachments, verification codes, or meeting links.
 - Public changes must be staged by exact path and checked with `scripts/Test-PublicRelease.ps1 -Staged`; a failing safety check must not be bypassed.
 
